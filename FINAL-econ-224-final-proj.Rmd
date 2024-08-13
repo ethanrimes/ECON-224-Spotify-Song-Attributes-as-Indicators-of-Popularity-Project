@@ -1,0 +1,2498 @@
+---
+title: "Requiem for a stream: Analyzing Spotify Song Attributes as Indicators of Popularity using Machine Learning Methods"
+author: "Ethan Kallett, Sabrina Peltier, Sabhya Raju, Rohin Shivdasani"
+date: "12/05/2021"
+output:
+  bookdown::pdf_document2:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
+    code_folding : "hide"
+bibliography: ["bibliography.bib"]  
+biblio-style: "apalink"
+link-citations: true
+urlcolor: blue
+---
+
+```{r libraries, include=FALSE, echo=FALSE, eval=TRUE}
+# the libraries used in this study
+knitr::opts_chunk$set(echo = TRUE, cache.lazy=FALSE, fig.pos = "H")
+rmarkdown::find_pandoc()
+library(tidyverse)
+library(glmnet)
+library(glmnetUtils)
+library(lubridate)
+library(vtable)
+library(tree)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(leaps)
+library(gbm)
+library(pROC) 
+library(matrixStats)
+library(cowplot)
+library(kableExtra)
+library(cluster)
+library(factoextra)
+library(mclust)
+library(patchwork)
+library(ISLR)
+library(Hmisc)
+
+```
+```{r import-data, cache = TRUE, echo=FALSE, eval=TRUE, include=FALSE}
+# import data
+grammy_raw <- read_csv("../econ-ml-project/data/the_grammy_awards.csv")
+spotify10s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-10s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify10s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-10s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+spotify00s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-00s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify00s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-00s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+
+spotify90s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-90s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify90s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-90s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+spotify80s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-80s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify80s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-80s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+spotify70s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-70s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify70s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-70s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+spotify60s <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-60s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_factor(),col_double(),col_factor(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_factor(),col_double(),col_double(),col_double()))
+spotify60s_num <- read_csv("../econ-ml-project/data/SpotifyHitPredictorDataset(1960-2019)/dataset-of-60s.csv", col_types = list(col_character(), col_character(),col_character(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),
+                                                                                                                                           col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double(),col_double()))
+artist_df <- read_csv("../econ-ml-project/data/BillboardFromLast20/artistDf.csv")
+spotify_daily <- read_csv("../econ-ml-project/data/filtered.csv")
+spotify_global <- spotify_daily %>% select(-`...1`)
+```
+
+# Introduction
+
+![](/Users/ethan/Documents/R/econ-ml-project/requiem-stream.jpg)
+
+As the music industry has moved onto the internet, streaming platforms like Spotify have increased access to a diverse array of songs and allowed many songs to reach new heights of popularity. With the end of the year approaching, many of us are encountering our connections on social media sharing their Spotify “Wrapped” which is a review of the user’s listening during the year. With more music released annually than any time in history, music consumers are empowered to search, discover, and follow disparate songs, artists, playlists. With such a broad ability for consumers to sample songs, we are interested in studying how songs’ intrinsic feature qualities and attributes dictate (or not) their popularity. 
+
+Media in other forms like but videos across platforms such as Facebook, TikTok, and Youtube, has evolved around the consideration that creators have a greater understanding of the social media sites’ algorithm for promoting and recommending content to viewers. That is, content creators have a deep understanding of the specific video attributes that they believe effect popularity; with Mr. Beast on Youtube as perhaps the most notable example. This has resulted in creators and producers fine tuning their content for attributes such as the video length, thumbnail images, title, upload consistency, and more. However, the same “popularity hacking” mentality is less prevalent and pervasive across the music industry. 
+
+As streaming platforms like Spotify make available more specific data and the relationship between song attributes and popularity is better understood over time, we believe we will see artists adopt a similar “hacking” ethos in how they create songs by premeditating some of the qualities analyzed in this paper, such as energy or speechiness, into their song in ways they wouldn’t otherwise. This leads us to our research question: What makes a song popular?
+
+There is limited research on the relationship between song audio features and popularity as measured by stream count which makes this study important and crucial. Record companies, Sportify, and artists can utilize the findings from this research to better understand and predict how songs climb to the top of charts. 
+
+We approach this question with a multi-faceted analysis. First, we analyze popularity as a discrete variable – whether a song ranked on the Billboard Hot 100 chart, achieved a Grammy award or received over a million streams over 2 weeks. Then, we analyze popularity through stream counts as continuous, specifically using ordinary least squares regression and random forest, as well as selection and shrinkage of methods LASSO and Ridge regression selection methods to elucidate the ability to song attributes as predictor variables of streaming volumes on Spotify. We also deploy unsupervised learning classification methods to investigate the broad popularity outcomes associated with different music genres.
+
+Our findings indicate that song attributes consistently show they are strong predictors of song popularity by as defined by presence on the Billboard Hot 100 ranking, but less reliably for predicting a Grammy Award or predicting the number of streams achieved on Spotify. Moreover, the presence of heterogeneity of the treatment effect, or in other words certain features being beneficial in certain genres and less so in others, really challenge the significance of the findings of this study and necessitate a fair amount of future research to be conducted. 
+
+# Literature Review
+
+The paradigm of popularity in music and songs has been the subject of extensive academic interest across academic disciplines, including but not limited to data science. The particular question of focus in this paper, which is to investigate the determinants of song popularity using song attributes, features, and qualities, has been a widely studied question, as have other considerations surrounding song popularity and its determinants. The specific research field on this topic is called Hit Song Science (HSS). 
+
+Previous research most directly similar to the analysis we conduct in our paper utilize standard measurements of song features and attributes to compare their impact on popularity across songs across songs. This research relies most often and heavily on the same song data we use in our paper such as speechiness, acousticness, valence, duration, acousticness, etc. measured by the Echo Nest Corp. until they were acquired by Spotify in 2014. Spotify now provides this data via their API. A 2013 study by Ceulemans and Detry titled Does Music Matter in Pop Music? The Impact of Musical Characteristics on Commercial Success and Critics' Ratings examined the impact of song attributes on popularity using data from Billboard’s Hot 100 rankings for popularity and song feature data from Echo Nest Corp. across a sample of 514 songs. In addition to the song attribute data, [@ceulemans2014does] custom added data about the song artist, specifically artist gender, artist nationality, and whether the artist is associated with a major label.  Both the peak position achieved by a song on Billboard’s Hot 100 chart as well as “survival” – the number of days a song remains on Billboard's Hot 100 chart were used as the measures of popularity. The paper found that the mode of a song and critics’ rankings of the song impacted the survival of a song in charts. The paper also discussed that for a song to be commercially successful, a song must be promoted and in line with current trends.  
+
+Askin and Mauskapf’s 2017 paper titled What Makes Popular Culture Popular? Product Features and Optimal Differentiation in Music instead studies the impact of artist reputation and previous success on peak position and survival on the Billboard Hot 100 Chart. The paper utilizes independent variables such as if the artist was associated with a major record label, the number of previous charting songs by an artist, and a custom criterion called “typicality” – or similarity to past successful songs from the genre, that is built using the Spotify / Echo Nest Corp. song attributes such as acousticness, valence, tempo, key, and genre. [@askin2017makes] find that a song’s position on charts is driven by artist familiarity, genre affiliation, institutional support, and perceived proximity to its peers. The paper also found that songs that were differentiated (i.e. had a low typicality) and that did not sound too much like previous and contemporaneous productions are more likely to reach a higher position on the chart meaning 
+
+A paper by [@suh2019] titled International Music Preferences: An Analysis of the Determinants of Song Popularity on Spotify for the U.S., Norway, Taiwan, Ecuador, and Costa Rica investigates popularity by analyzing the effect of song attributes on popularity but with a focus on their different impacts across countries. The paper examines three main various audio and artist features of songs, including whether or not a track features a guest artist, a happiness index based on the height of valence levels, and an energy level based on abrasiveness and loudness, the latter two of which are constructed from the same Spotify-provided song attributes examined in our paper. The paper runs a 10 separate ordinary least squares regressions, using two measures of song popularity from the Spotify’s Top 200 chart in each of the following 5 countries: the U.S., Norway, Taiwan, Ecuador, and Costa Rica. Popularity is measured via two dependent variables using data from Spotify’s daily Top 200 chart in each of these countries: (1) a track’s peak position on the chart and (2) the number of days it survives on a country’s Spotify Top 200 chart. The paper concludes that in most all countries, the presence of a featured artist on a track increased both peak position and survival on the Top 200 chart. However, louder and more abrasive songs demonstrated significantly shorter chart lifespans in three of five countries: the U.S., Norway, and Taiwan. Meanwhile, happier songs achieved both higher peak chart positions and longer chart lifespans in two of the five countries: Norway and Taiwan.
+
+In a paper titled Experimental Study of Inequality and Unpredictability in an Artificial Cultural Market, [@salganik2006] construct an artificial market to study social influence as a determinant of song success as measured by downloads.  [@salganik2006] found that the number of downloads affects both the degree of popularity achieved by a song with new listeners and the reported level of enjoyment listening to the song for those with prior song download number knowledge.  [@salganik2006] asserts that high downloads have a signaling effect and create a superstar effect, as music listeners with access to this information assume that highly downloaded songs are more worthy of being listened to. Thus, the paper concluded that in addition to personal preference and song quality, consumer song choice in the music industry is a function of the number of downloads attached to a song.
+
+A paper by [@nijkamp2018prediction] called Prediction of product success: explaining song popularity by audio features from Spotify data, researched the relationship between song  audio features like key and tempo from the Spotify database and song popularity measured by the number of streams a song has. The research used a novel attribute-approach to study whether these audio features could account for the number of streams. The paper finds that audio features can explain a higher number of streams only moderately.
+
+# Data Review
+
+This project principally relied on four different datasets sourced from Kaggle. The first [Spotify Charts](https://www.kaggle.com/dhruvildave/spotify-charts) contained daily observations from 2017 through the end of 2019 of the most popular 200 songs in 50 distinct countries/regions around the world. It was absolutely essential helping us calculate the streams achieve song had achieved.
+
+The second major data set was [The Spotify Hit Predictor Dataset (1960-2019)](https://www.kaggle.com/theoverman/the-spotify-hit-predictor-dataset). This dataset contained information about all the song attributes we examined. The song features we examined from this dataset are: `danceability` (a 0-1 scale of how suitable for dancing), `energy` (a 0-1 scale of the song's energy intensity), `key` (mapping of keys to integers, interpreted as factor), `loudness` (overall loudness in decibels), `mode` (major or minor key, interpreted as factor), `speechiness` (0-1 scale assessing the presence of spoken words), `acousticness` (0-1 scale of the confidence that the track is acoustic), `instrumentalness` (0-1 scale measuring the lack of spoken words), `duration_ms` (duration of the song in milliseconds), `liveness` (0-1 scale assessing the presence of an audience in the recording), `valence` (0-1 scale assessing the musical positiveness conveyed by the track), `tempo` (measured in beats per minute), `time_signature` (beats per bar, interpreted as factor), `chorus_hit` (the author's best estimate of when the chorus begins, measured in milliseconds), and `sections` (number of sections in the track).
+
+The third major dataset was [Data on Songs from Billboard 1999-2019](https://www.kaggle.com/danield2255/data-on-songs-from-billboard-19992019). This contained the response variable of whether the song had been featured in the Billboard Hot 100 or not. This data set also contained the artist metadata `Followers`, `NumAlbums`, `YearFirstAlbum` (which we converted into `years_since_1st_album`), `Gender` (converted to `is_male`) and `Group.Solo` (converted to `is_group`).
+
+Finally, we used the dataset [The Grammy Awards](https://www.kaggle.com/unanimad/grammy-awards) which contained the list of all the Grammy awards given since its inception in 1958. 
+
+```{r key-vars, eval=TRUE, echo=FALSE}
+tibble(features=c("streams", "danceability", "energy", "key", "loudness", 
+                  "speechiness", "acousticness", "instrumentalness", "liveness", 
+                  "valence", "tempo", "duration_ms", "time_signature", "chorus_hit", 
+                  "sections", "Followers", "NumAlbums", "years_since_1st_album", 
+                  "is_male", "is_group", "billboard", "grammy"),
+       source=c("Spotify Charts", rep("The Spotify Hit Predictor Dataset", 14), 
+                rep("Billboard 1999-201", 6),
+                rep("The Grammy Awards", 1))) %>%
+      kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Features",
+                                      "Source"),
+                        caption = "Summary of Key Features") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+  
+```
+
+In summary, the key features used in this study can be seen in Table \@ref(tab:key-vars).
+
+# Methods and Findings
+
+## Clustering
+
+### Standardize Data
+
+```{r standardize-data, echo=FALSE}
+#Combine yearly datasets into one
+spotify60yr <- bind_rows(spotify10s_num,
+                         spotify00s_num,
+                         spotify90s_num,
+                         spotify80s_num,
+                         spotify70s_num,
+                         spotify60s_num)
+#Remove Empty Rows
+spotify60yr = na.omit(spotify60yr)
+#Remove URI
+spotify60yr = spotify60yr %>%
+  select(-uri)
+
+#Standardize Data
+spotify60yr_scaled <- scale(spotify60yr %>% select(-artist, -track, -target)) %>% 
+   as_tibble() %>%
+  mutate_all(as.numeric) 
+```
+
+### Selecting K
+
+We will begin our analysis by applying clustering to our data to investigate how popularity outcomes differ with music genres. To select the number of clusters we used BIC, where $$\textrm{BIC} = \textrm{RSS} + S \frac{\ln n}{n}$$ RSS, the residual sum squared errors, measures the error which is the distance an observation is from its cluster center. Looking at a plot of cluster numbers and BIC, 10 clusters were selected. This value was chosen based on what appeared to be the elbow of the graph and reasonable to analyze. 
+
+```{r, echo=FALSE, fig.width=10}
+# Selecting number of clusters 
+set.seed(123)
+n = nrow(spotify60yr_scaled)
+# Compute and plot rss for k = 1 to k = 25
+k.values = 1:25
+BIC = rep(0,25)
+set.seed(24)
+sample.indices = sample(nrow(spotify60yr_scaled),30)
+spotify60yr_scaled_sample = spotify60yr_scaled %>%
+  filter(row_number() %in% sample.indices)
+for (k in k.values){
+  rss = kmeans(spotify60yr_scaled_sample,
+                  centers = k,
+                  nstart = 100)$tot.withinss
+  BIC[k] = (rss + k*log(n))/n
+}
+BIC_values = as_tibble(k.values, BIC)
+ggplot(BIC_values, aes(x = k.values, y = BIC)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Number of clusters",
+       y = "BIC")
+```
+```{r, include=FALSE}
+#K-Means Cluster with Optimal K
+cluster.spotify = kmeans(spotify60yr_scaled,
+                         centers = 10, nstart = 25)
+cluster.spotify
+```
+
+
+### Clusters and Popularity
+
+Once the clusters were determined, the variables “track” and “artist” were added back to the scaled data. The “scaled_clustering” data included the track name, artist, scaled attributes, and the cluster assigned to each song. With this data set, we were able to combine it with the larger aggregated Spotify data set which includes the streams for each song. With this we were able to group all songs by their cluster and find the average stream per song in a given cluster. This tibble shows there is a clear discrepancy in popularity between clusters. The most popular (cluster #1) having an average of 138,970,246 streams per song and the least popular cluster (10) having an average of 10,460,082 streams per song. This indicates the similar qualities of songs can contribute to the amount of streams it will receive. Looking at the number of songs in each cluster, there is a range from around 500 to around 10,000. Unsurprisingly, the cluster with the highest average stream per song has the third most songs in it’s cluster (6,193), indicating artists are creating more songs with attributes that are correlated with more streams. Also following this pattern is cluster #9 which has the largest number of songs and has the second highest average number of streams per song. However, the least streamed cluster falls in the middle of the ranking with 3,358 songs in the cluster, meaning there are decent amount of songs with less streams. 
+
+```{r, include=FALSE}
+#K-Menas Cluster, Re-adding Character Columns (artist/track)
+set.seed(124)
+model2 <- kmeans(spotify60yr_scaled, centers = 10, nstart = 50)
+scaled_clustering <-
+  broom::augment(model2,
+          spotify60yr_scaled) %>%
+  bind_cols(spotify60yr[,1],
+            spotify60yr[,2]) 
+names(scaled_clustering)[17]<- "track"
+names(scaled_clustering)[18]<- "artist"
+  
+```
+```{r, include=FALSE}
+#The total streams for a song
+spotify_aggregated <- spotify_global %>%
+  group_by(title, artist) %>%
+  summarise(streams = sum(streams)) %>%
+  ungroup()
+#Add total streams to data
+joined_df <- scaled_clustering %>% inner_join(
+  spotify_aggregated, 
+  by = c("track" = "title",
+         "artist" = "artist"))
+```
+```{r, include=FALSE}
+#Number of Songs in each Cluster
+Song= scaled_clustering %>% 
+  group_by(.cluster) %>%
+  summarise(num_songs = n()) %>%
+  ungroup() %>%
+  arrange(desc(num_songs))
+#Average Number of Streams per Song in each Cluster
+plays = joined_df %>% drop_na() %>%
+  group_by(.cluster) %>%
+  summarise(avg_streams_per_song = sum(streams)/n()) %>%
+  ungroup() %>%
+  arrange(desc(avg_streams_per_song)) 
+```
+```{r, echo=FALSE}
+#Convert tibbles to tables
+# kable(Song, col.names = c('Cluster','Number of Songs'),
+#       caption = 'Number of Songs in Each Cluster',
+#       align="lc")
+kable(plays, col.names = c('Cluster','Streams'),
+      caption = 'Custer Popularity, Average Streams per Song',
+      align="lc") %>% 
+  kable_styling(latex_options = "HOLD_position")
+```
+```{r, include=FALSE}
+#Sample List of Songs in Each Cluster
+scaled_clustering %>% filter(.cluster == 1) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 2) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 3) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 4) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 5) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 6) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 7) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 8) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 9) %>%
+  select(track, artist) %>% head(25)
+scaled_clustering %>% filter(.cluster == 10) %>%
+  select(track, artist) %>% head(25)
+```
+
+
+### Naming Clusters
+
+Next, I examined a sample of songs selected for each category to see how they could be qualitatively described. From each cluster I looked at the first 25 songs to gain insight into the types of songs. From this I was able to title the different clusters.
+
+```{r song-popularity-table, echo=FALSE}
+tibble(cluster = as.factor(c(1:10)),
+       name = c("Slow, Soul, Breakup",
+                "Dark, Epic, Video-Game",
+                "Slow Country, Movie Montage",
+                "Trendy, Hip-Hop, Club",
+                "Pop Rap, Dance, Less Well Known",
+                "Orchestra",
+                "Harsh Rap, Intense, Metal",
+                "Indie Rap, Alternative",
+                "Popular, Radio, Head-Nod (Not Dance)",
+                "Background Music")) %>%
+  inner_join(Song, by = c("cluster" = ".cluster")) %>%
+  kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Cluster", 
+                                      "Style/Type/`Vibe`",
+                                      "Observations per Cluster"),
+                        caption = "Subjective Naming of Clusters") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+
+A challenge presented itself when working on this section because, despite there being massive amounts of data, there is still an artistic quality to music. It was easy for me to feel how two songs were similar, but putting it into words was a bit difficult. Table \@ref(tab:song-popularity-table) summarises my conclusions. Looking at the words used to label the clusters and popularity, something that surprised me is the “breakup” style cluster (#1) had the most streams per song. However, it does make sense since the artists in this cluster, such as Cole Swindle, One Direction, Carrie Underwood, and Sam Smith, are extremely well known. Unsurprisingly, cluster #9, which I described as popular, radio music, was second on the list of average streams per song. Another observation was the lack of streams per song for cluster #10 which could only be described as background music. Another interesting aspect of this section to note is that a measure of popularity was not used to cluster these songs, however there were observable trends and well known songs were clustered together. For example, cluster #5 ranked low in terms of average streams per song and the artists in the cluster are not mainstream. This indicates there are measurable attributes of a song that can contribute to it’s success or failure. 
+
+### Visual Analysis
+
+Finally, we are created a graphic to explore the differences in measured attributes	across clusters. To do this, we are grouped the songs by cluster and found the mean value for each song component for each cluster using the standardized data.
+ 
+ 
+```{r, echo=FALSE}
+#Creating a graph of the mean value for each cluster's attributes
+scaled_clustering %>%
+  select(-track,-artist) %>%
+  group_by(.cluster) %>%
+  summarise(danceability = mean(danceability),
+            energy = mean(energy),
+            key = mean(key),
+            loudness= mean(loudness),
+            mode=mean(mode),
+            speechiness=mean(speechiness),
+            acousticness=mean(acousticness),
+            instrumentalness=mean(instrumentalness),
+            liveness=mean(liveness),
+            valence=mean(valence),
+            tempo=mean(tempo),
+            duration_ms=mean(duration_ms),
+            time_signature=mean(time_signature),
+            chorus_hit=mean(chorus_hit),
+            sections=mean(sections)) %>%
+  pivot_longer(cols=c(danceability, energy,key,loudness,mode,speechiness,acousticness,instrumentalness,liveness,valence,tempo,duration_ms,time_signature,chorus_hit,sections), names_to = "metric", values_to = "coef") %>%
+  transmute(metric=as.factor(metric),coef=coef,cluster=as.factor(.cluster)) %>%
+  ggplot(aes(y=coef, x=cluster, fill=cluster)) +
+  geom_bar(position="dodge", stat="identity") + 
+  labs(title = "Cluster Analysis of Features Analyzed") +
+  facet_wrap(~metric) +
+  theme(plot.title = element_text(hjust=0.5),
+        text = element_text(size=9))
+```
+
+The duration for cluster 6 is much higher than any of the other clusters, which makes sense since classical music tends to be long. A similar observation can be made for the variable “sections” where cluster 6 is significantly higher than other clusters. 
+
+Energy is similar across clusters, however we observe a slight dip in clusters 1, 3, 6, and 10. This matches the descriptions given (soul, slow country, orchestra, background music). 
+
+Another interesting observation is the time signature graph. All the clusters have similar, near zero, values for the average time signature. However, cluster #3’s average is significantly lower. When classifying cluster #3 I found it difficult to pinpoint what the exact “vibe” was and how this group differed from others. The data indicates the “feeling” cluster #3 was different than others was most likely due to the low time signature. 
+
+
+### Conclusion 
+
+K-means clustering was able to group similar songs together based on their quanatifable attributes. This method is applicable to real life because Spotify offers multiple daily playlists unique to each user (Daily Mix 1-5) and each playlist tends to be a different "vibe", not necessarily genre. This style of machine learning could be used to create playlists for users. Spotify could also use this style of unsupervised learning to market new songs by finding their cluster and suggesting the song to people who heavily listen to that cluster. Spotify is highly specific and goes beyond traditional genres, such as "emo", to create more precise genres, such as "midwest emo". Since Spotify has a massive number of songs available, many more clusters could be added to find hyper-specific groups of similar songs for users. This style of machine learning has the potential for users to be matched with large of songs they enjoy based on qualities it is difficult to distinguish by just listening.  
+
+## Continuous Response
+
+Before we begin, we will complete a very basic data exploration. 
+
+```{r, include=FALSE, eval=TRUE}
+# Before we begin our exploration, we will clean and organize our data. 
+
+spotify60yr <- bind_rows(spotify10s_num,
+                         spotify00s_num,
+                         spotify90s_num,
+                         spotify80s_num,
+                         spotify70s_num,
+                         spotify60s_num) %>%
+  select(-key)
+
+# we will group by song title and add up the number of streams for each song 
+# title, while removing the missing values
+spotify_global = spotify_global %>% 
+  group_by(title) %>% 
+  mutate(sum_streams = sum(streams)) %>%
+  filter(!is.na(sum_streams))
+
+# join the spotify global dataset with the hit predictor dataset which contains
+# features for songs 
+combined_df <- spotify_global %>% 
+  inner_join(spotify60yr, by =c("title" = "track", 
+                                         "artist" = "artist")) %>% 
+  filter(!is.na(sum_streams))
+
+# extract the date
+combined_df = combined_df %>%
+           mutate(year = year(date),
+                  month = month(date),
+                  day = wday(date))
+
+# remove non-numeric features and irrelevant columns
+combined_df = combined_df %>% 
+  subset(select = -c(title, artist, uri, streams, target, region, trend, 
+         url, chart, date, time_signature, rank))
+
+# store a scaled version of the features
+combined_df_scaled = combined_df
+combined_df_scaled$sum_streams <- scale(combined_df$sum_streams)
+combined_df_scaled$danceability <- scale(combined_df$danceability)
+combined_df_scaled$energy <- scale(combined_df$energy)
+combined_df_scaled$loudness <- scale(combined_df$loudness)
+combined_df_scaled$speechiness <- scale(combined_df$speechiness)
+combined_df_scaled$acousticness <- scale(combined_df$acousticness)
+combined_df_scaled$instrumentalness <- scale(combined_df$instrumentalness)
+combined_df_scaled$liveness <- scale(combined_df$liveness)
+combined_df_scaled$valence <- scale(combined_df$valence )
+combined_df_scaled$tempo <- scale(combined_df$tempo)
+combined_df_scaled$duration_ms <- scale(combined_df$duration_ms)
+combined_df_scaled$sections <- scale(combined_df$sections)
+combined_df_scaled$chorus_hit <- scale(combined_df$chorus_hit)
+```
+```{r, eval=TRUE, echo=FALSE}
+# We will begin by exploring our datasets to gain a deeper understanding of them so as to inform our ML models going forward.
+
+# high level look at the features
+sumtable <- st(combined_df, out="return", file="summary_stats")
+sumtable %>% kable(format = "latex", row.names = NA,
+                        booktabs = TRUE,
+                        digits = 3,
+                        caption = "Summary Statistics of Features") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+Now, we will look at the distributions of a key features in relation to number of streams. 
+
+```{r, fig.width=5, fig.height=3, out.width="100%",fig.align="center",fig.cap="How number of streams varied by year", echo=FALSE,eval=TRUE}
+
+plot1a <- combined_df %>% 
+  group_by(year) %>%
+  summarise(n = n(), 
+            year_streams = sum(sum_streams)) %>%
+  ggplot(aes(x = year, y=year_streams)) +
+   geom_bar(color="tan1", fill="tan1", stat = "identity") +
+   labs(x = "Year",
+        y = "Number of streams",
+        title="How number of streams varied by year") +
+  theme(text = element_text(size=8))
+
+plot1b <- combined_df_scaled %>% 
+  ggplot(aes(x = loudness, y=sum_streams)) +
+   geom_point(color="tan1", fill="tan1", stat = "identity") +
+   labs(x = "Loudness",
+        y = "Number of streams (scaled)",
+        title="How number of streams varied by loudness") +
+  theme(text = element_text(size=8))
+
+plot1c = combined_df_scaled %>% 
+  ggplot(aes(x = danceability, y=sum_streams)) +
+   geom_point(color="tan1", fill="tan1", stat = "identity") +
+   labs(x = "Danceability",
+        y = "Number of streams (scaled)",
+        title="How number of streams varied by danceability") +
+  theme(text = element_text(size=8))
+
+plot1d = combined_df_scaled %>% 
+  ggplot(aes(x = acousticness, y=sum_streams)) +
+   geom_point(color="tan1", fill="tan1", stat = "identity") +
+   labs(x = "Acousticness",
+        y = "Number of streams (scaled)",
+        title="How number of streams varied by acousticness") +
+  theme(text = element_text(size=8))
+
+plot1e = combined_df_scaled %>% 
+  ggplot(aes(x = energy, y=sum_streams)) +
+   geom_point(color="tan1", fill="tan1", stat = "identity") +
+   labs(x = "Energy",
+        y = "Number of streams (scaled)",
+        title="How number of streams varied by energy") +
+  theme(text = element_text(size=8))
+
+```
+
+
+```{r, include=TRUE, eval=TRUE, echo=FALSE}
+
+plot_grid(plot1a, plot1b, plot1c, plot1d, plot1e)
+```
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Now, we can begin our exploration of the datasets. We are interested in how 
+# popularity, as a continuos measure, can be predicted using features of songs 
+# in the Spotify dataset. For our analysis, we will use the number of streams a
+# song has a proxy for its popularity. That is, the higher the number of streams,
+# the more popular a song is. 
+# 
+# We will start with a simple OLS regression. 
+
+# run OLS regression on streams with scaled version of dataset
+set.seed(123)
+X = model.matrix(sum_streams ~ ., combined_df_scaled)[,-1]
+y = combined_df_scaled$sum_streams
+test.indices = sample(1:nrow(X), nrow(X)/4)
+X.test = X[test.indices,]
+X.train = X[-test.indices,]
+y.test = y[test.indices]
+y.train = y[-test.indices]
+data_train = cbind(X.train, y.train)
+
+regOLS = lm(y.train ~ ., data = as.data.frame(data_train))
+
+summary(regOLS)
+
+```
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# make predicts with the OLS model on test data
+data_test = cbind(X.test, y.test)
+regOLS_predict = predict(regOLS, as.data.frame(data_test))
+
+# determine the test MSE for this model
+ols_test_MSE = mean((as.data.frame(data_test)$y.test - regOLS_predict)^2)
+print(paste('OLS Test MSE:', round(ols_test_MSE, 2), sep = ' '))
+```
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Before we move forward, we take a look at the VIF of our features to determine
+# if there is any multicollinearity in our data. As per sources, we intend on 
+# removing features with VIF > 10. 
+
+# calcuate VIF for features
+car::vif(regOLS)
+```
+
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# As we can see, none of the features have VIF > 10 so we do not remove any features
+# from our model. The 'energy' feature has the highest VIF at 5.8, followed by 
+# 'loudness' at 4.8. 
+# 
+# Next, we will use the best-subset method on our data. 
+
+# determine the best subset of k features for our model
+best_subset_fit = regsubsets(sum_streams ~ ., data = combined_df, nvmax = 16, really.big=T)
+best_subset_summary = summary(best_subset_fit)
+nb_regressors = which.min(best_subset_summary$cp)
+print(paste('Optimal number of regressors:', nb_regressors, sep = ' '))
+```
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Alternatively, we will use AIC/BIC to determine the best value of k for our purposes. 
+
+# AIC
+AIC_results = tibble(Number = c(1:16), AIC = best_subset_summary$cp)
+
+plot1 = ggplot(AIC_results, aes(x = Number, y = AIC)) +
+  geom_point() +
+  geom_line() +
+  geom_vline(aes(xintercept = which.min(best_subset_summary$cp), color="red", show.legend = F) ) +
+  xlab("Number of regressors") +
+  ylab("AIC") +
+  theme(legend.title = element_blank()) 
+
+# BIC 
+BIC_results = tibble(Number = c(1:16), BIC = best_subset_summary$bic)
+
+plot2 = ggplot(BIC_results, aes(x = Number, y = BIC)) +
+  geom_point() +
+  geom_line() +
+  geom_vline(aes(xintercept=which.min(best_subset_summary$bic), color="red", show.legend = F) ) +
+  xlab("Number of regressors") +
+  ylab("BIC") +
+  theme(legend.title = element_blank()) 
+
+pall = plot1 + plot2
+pall & theme(legend.position = 'none')
+```
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# As we can see, AIC recommends using k=14 regressors while BIC recommends k=15.
+# We will choose k = 15 since it has higher Rˆ2 and lower error term.
+
+best_subset_summary$rsq[14]
+best_subset_summary$cp[14]
+best_subset_summary$rsq[15]
+best_subset_summary$cp[15]
+```
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Now, we will find the Best subset MSE with 10-fold cv. 
+
+
+set.seed(1)
+nfolds = 10 
+folds = cut(seq(1, nrow(combined_df_scaled)), breaks = nfolds, labels=FALSE)
+best.subset.cv.error = 0 
+X = model.matrix(sum_streams ~ ., combined_df_scaled)[,-1]
+y = combined_df_scaled$sum_streams
+
+# Loop that performs cross-validation for best subset
+for (j in 1:nfolds){
+  
+  # In the j-th fold, the elements of folds_indices that != j are in the train set
+  indices = which(folds == j)
+  y_train = y[-indices] 
+  X_train = X[-indices, names(coef(best_subset_fit, id = nb_regressors)[-1])]
+  data_train = cbind.data.frame(y_train, X_train)
+  colnames(data_train)[1] = 'sum_streams'
+
+  # The elements of folds_indices that = j are in the test set
+  y_test = y[indices]
+  X_test = X[indices, names(coef(best_subset_fit, id = nb_regressors)[-1])] 
+  data_test = cbind.data.frame(y_test, X_test)
+  colnames(data_test)[1] = 'sum_streams'
+
+  # Fit the linear regression on the train data
+  lm_fit = lm(sum_streams ~ ., data = data_train)
+  
+  # Predict sum_streams on the test data
+  predict = predict(lm_fit, data_test)
+  best.subset.cv.error = best.subset.cv.error + mean(((y_test - predict)^2))/nfolds
+}
+
+print(paste('Best subset test MSE:', round(best.subset.cv.error, 2), sep = ' '))
+
+```
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# We will now look at Ridge regression to predict popularity of songs. 
+
+X = model.matrix(sum_streams ~ ., combined_df_scaled)[,-1]
+y = combined_df_scaled$sum_streams
+set.seed(123)
+lambda_grid = 10^seq(10, -2, length = 1000)
+# glmnet scales our data
+ridge.fit = glmnet(X, y, alpha=0, lambda = lambda_grid)
+# find optimal value of lambda with CV
+ridge_cv = cv.glmnet(X,y, nfolds = 10, alpha = 0)
+ridge_optimal_lambda = ridge_cv$lambda.min
+print(paste('Optimal lambda:', round(ridge_optimal_lambda, 2), sep = ' '))
+
+```
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# split the dataset into train and test datasets
+test.indices = sample(1:nrow(X), nrow(X)/4)
+X.test = X[test.indices,]
+X.train = X[-test.indices,]
+y.test = y[test.indices]
+y.train = y[-test.indices]
+
+# Ridge prediction and finding test MSE
+ridge.predict = predict(ridge.fit, x=X.train, y=y.train, s=ridge_optimal_lambda, newx=X.test, exact=T)
+MSE_ridge = min(ridge_cv$cvm)
+print(paste('Ridge test MSE:', round(MSE_ridge, 2), sep = ' '))
+```
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Next, we will look at Lasso regressions. 
+
+set.seed(123)
+lasso.fit = glmnet(X, y, alpha=1)
+lasso_cv = cv.glmnet(X, y, nfolds = 10, alpha = 1)
+lasso_optimal_lambda = lasso_cv$lambda.min
+print(paste('Optimal lambda:', round(lasso_optimal_lambda, 2), sep = ' '))
+```
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Lasso prediction and finding test MSE
+lasso.predict = predict(lasso.fit, s=lasso_optimal_lambda, newx=X.test)
+MSE_lasso = min(lasso_cv$cvm)
+print(paste('LASSO test MSE:', round(MSE_lasso, 2), sep = ' '))
+```
+
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# Finally, we will move to a tree based regression: Random Forest. 
+
+n = nrow(combined_df)
+set.seed(10)
+
+# obtain optimal mtry for each model
+set.seed(11)
+tune_streams = tuneRF(x = X.train, y = y.train,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+rf_tune_tibble = tibble(
+  rf_obj = c("streams"),
+  mtry = c(tune_streams$mtry)
+)
+
+set.seed(11)
+forest_model.combined_df = randomForest(y.train ~., 
+                                 as.data.frame(cbind(X.train, y.train)), 
+                                 mtry = tune_streams$mtry,
+                                 importance = FALSE,
+                                 ntree = 500)
+```
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+rf.predict = predict(forest_model.combined_df, newdata=as.data.frame(X.test), type="response")
+rf_test_MSE = mean((rf.predict - y.test)^2)
+print(paste('RF test MSE:', round(mean((rf.predict - y.test)^2), 2), sep = ' '))
+```
+
+```{r, include=FALSE, eval=TRUE, echo=FALSE}
+# We will now compare the coefficients of Best Subset, Ridge and Lasso regressions. 
+
+# Extract the coefficients for each model and store them in a matrix for easy comparison
+ols_coef = regOLS$coefficients
+best_subset_coef = coef(best_subset_fit, id = nb_regressors)[-1];
+ridge_coef = coef(ridge_cv, ridge_optimal_lambda)[-1];
+lasso_coef = coef(lasso_cv, lasso_optimal_lambda)[-1];
+rf_coef = tune_streams$importance
+Features = c('danceability','energy','loudness','mode','speechiness','acousticness','instrumentalness','liveness','valence','tempo','duration_ms','chorus_hit','sections', 'year', 'month', 'day')
+coef_mat = cbind(rep(0, length(ridge_coef)), ols_coef, ridge_coef, lasso_coef, rf_coef)
+colnames(coef_mat) = c('OLS', 'Best_Subset', 'Ridge', 'LASSO', 'Random_Forest')
+
+#add best-subset coefficients to the matrix
+for (i in 1:length(best_subset_coef)){
+  coef_mat[names(best_subset_coef)[i], 1] = best_subset_coef[i]
+}
+
+# standardize the coefficient values
+coef_mat_df = as.data.frame(cbind(coef_mat, Features))
+coef_mat_df$OLS = as.numeric(coef_mat_df$OLS)
+coef_mat_df$OLS = scale(coef_mat_df$OLS)
+coef_mat_df$Best_Subset = as.numeric(coef_mat_df$Best_Subset)
+coef_mat_df$Best_Subset = scale(coef_mat_df$Best_Subset)
+coef_mat_df$Ridge = as.numeric(coef_mat_df$Ridge)
+coef_mat_df$Ridge = scale(coef_mat_df$Ridge)
+coef_mat_df$LASSO = as.numeric(coef_mat_df$LASSO)
+coef_mat_df$LASSO = scale(coef_mat_df$LASSO)
+coef_mat_df$Random_Forest = as.numeric(coef_mat_df$Random_Forest)
+coef_mat_df$Random_Forest = scale(coef_mat_df$Random_Forest)
+```
+
+### Overview 
+For this part of the study, we attempted to study song popularity as a continuous variable. We proxyed for popularity of a song by looking at its number of streams. The number of streams of a song is a straightforward and intuitive metric to studying how popular a song since it indicates how well liked a song is for users on Spotify. A limitation of using this metric is that it does not provide insight on how many of the streams were repeat streams vs new streams over a time period. 
+
+We used the same datasets as the previous analysis with popularity as a discrete variable. Specifically, we used Spotify Charts and The Spotify Hit Predictor Dataset (1960-2019) — the two datasets that gave us information on individual songs and its streams. We did not use the datasets with information from Billboard Hot 100 and Grammies as they did not provide relevant data for our analysis, which is primarily focused on song characteristics and its popularity. The independent variables we were interested in for this section included: rank, danceability, energy, loudness, 
+mode, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration_ms, chorus_hit, sections, year, month, day. 
+
+We ran the following predictive models: ordinary least squares regression, best subset selection, ridge regression, lasso regression, and random forest.
+
+#### Ordinary least squares regression
+this regression model fits the data with a regression line that minimizes the sum of the squares of the residuals. We used this regression model to look at the linear relationship between the number of streams and the independent variables.
+
+#### Best subset selection
+involves identifying a subset of the regressors that are believed to be related to number of streams. We use AIC/BIC to determine the optimal subset size. 
+
+#### Ridge regression
+is used when data suffers from multi-collinearity, which was a very real concern in our data. We used cross volidation to find the optimal lambda for our regression. 
+
+#### Lasso regression
+uses shrinkage to predict linear relationship in data. Again, we used cross validation to find the optimal lambda for our regression. 
+
+#### Random Forest
+this classification method that uses decision trees to predict. We leveraged cross validation to find the tuning parameter mtry. 
+
+### Findings
+
+#### Test MSE
+```{r, echo=FALSE}
+tibble(model = c("OLS", "Best Subset", "Ridge", "LASSO", "Random Forest"),
+       values = c(round(ols_test_MSE, 2), round(best.subset.cv.error, 2), round(MSE_ridge, 2), round(MSE_lasso, 2), round(mean((rf.predict - y.test)^2), 2))) %>%
+    kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Model",
+                                      "Test MSE"),
+                        caption = "Model Comparison for Continuous Response") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+As we can see from the above values, the test MSE is lowest for Random Forest. We were surprised to see that the test MSE for Random Forest was 0. This likely because the percentage of variance explained in the model was 99.99, which is incredibly high for a random forest model. Apart from Random Forest, the Lasso regression model produced the lowest test MSE and had a very similar test MSE value to Ridge regression. Both Ridge and Lasso regression marginally improved on the OLS regression's regression fit suggesting that regularization did not make a significant difference in our problem. The low test MSE of OLS regression suggests that a linear relationship between number of streams and the independent variables well explains the relationship between the two in our analysis. The Best Subset model also produced a low test MSE, which makes it a very comparable model to the rest of the regression models. Overall, apart from the tree regression method Random Forest, the rest of the regressions had very similar (low) test MSEs which suggest that their fit to the data is high. That is, linear regression models are able to explain the relationship well. 
+
+#### Coefficients from regressions
+
+```{r continuous-plot2, fig.width=8, fig.height=5, out.width="100%",fig.align="center",fig.cap="Comparison of Model Coefficients", echo=FALSE,eval=TRUE}
+coef_mat_df %>% 
+  pivot_longer(cols=c(OLS, Best_Subset, Ridge, LASSO, Random_Forest), names_to = "Regression", values_to = "coef") %>%
+  transmute(metric=as.factor(Features),coef=coef, Regression=as.factor(Regression)) %>%
+  ggplot(aes(y=coef, x=Regression, fill=Regression)) +
+  geom_bar(position="dodge", stat="identity") + 
+  facet_wrap(~metric) +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.5, "cm"), 
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), 
+        plot.title = element_text(hjust=0.5)) +
+   labs(y = "Coefficient Values",
+        title="How coefficient calues varied by regression model")
+```
+
+From looking at the above plots, we can immediately tell that there is quite a bit of variability in the coefficient values from each prediction model. We see that acousticness is an important feature in all the models with a relatively high positive coefficient value. Further, it is interesting to see that this coefficient values are similar across the various models we used. This suggests that the higher the confidence of a song being acoustic (measured by acousticness feature), the higher the chance the song is popular. Another interesting finding from this analysis is that danceability's coefficient value is varied across models, in fact, four of the five models indicate a negative relationship between danceability and number of streams. Only, random forest includes a positive coefficient value for danceability. The coefficient values themselves are higher in absolute terms than other coefficients suggesting the importance of a song being danceable in its popularity. Since random forest had the most accurate predictions and its model included a large positive coefficient value for danceability we can say with confidence that this feature is a key indicator. Unsurprisngly, we also see low coefficient values for day, month, and year suggesting that the date of data capture is not revealing of a song's stream count. Loudness and sections are two other coefficients that had low values across our regression models. Interestingly, our random forest model and linear models disagreed in regards to the sign substantially and value frequently of the coefficients. Nearly 12 of the 16 coefficients had a different sign and significant difference in value when comparing the random forest model to the linear models. 
+
+Overall, we see that the variables with the greatest net positive influence are `acousticness`, `duration_ms`, `sections` and the variables with the greatest net negative influence are `instrumentalness`, `liveness` and `tempo`. In contrast to the result from [@nijkamp2018prediction], our findings suggest that audio features explain the number of streams sizably, especially our random forest model. 
+
+
+## Discrete Response
+
+```{r wrangle-1, echo=FALSE, eval=FALSE}
+# wrangle data for use
+
+# obtain 60 years of Spotify feature data
+spotify60yr <- bind_rows(spotify10s,
+                         spotify00s,
+                         spotify90s,
+                         spotify80s,
+                         spotify70s,
+                         spotify60s) %>%
+  select(-key)
+songoftheyr <- grammy_raw %>% filter(category == "Song Of The Year",
+                                      year > 1959) 
+grammy_wrangled <- grammy_raw %>% select(year, category, nominee, artist, workers)
+
+```
+```{r get-combined-with-without-meta, echo=FALSE, eval=FALSE}
+# the artists in the Grammy data and Spotify data don't exactly match
+# combine the artist and worker columns and see if the Spotify artist
+# is contained in this combined string
+grammy_wrangled <- grammy_wrangled %>% mutate(artist = tidyr::replace_na(artist, ""),
+                                              workers = tidyr::replace_na(workers, "")) %>%
+  mutate(artist_combined = str_c(grammy_wrangled$artist, 
+                                 grammy_wrangled$workers, 
+                                 sep= " ", collapse = NULL)) %>%
+  select(year, category, nominee, artist_combined) %>%
+  drop_na()
+
+matches <- spotify60yr %>% 
+  inner_join(grammy_wrangled, 
+             by = c("track" = "nominee")) %>%
+  arrange(desc(year))
+
+for (i in 1:nrow(matches)) {
+  matches$same[i] = (
+    (grepl(matches$artist[i], matches$artist_combined[i]))
+  )
+}
+
+matches %>% filter(same == FALSE) %>% 
+  select(track, artist, artist_combined, year, category) %>%
+  arrange(track)
+
+# obtain joined df
+matches <- matches %>% filter(same == TRUE) %>% 
+  group_by(track,artist) %>%
+  summarise(irrelevant = sum(target)) %>%
+  ungroup() %>%
+  select(-irrelevant) %>%
+  mutate(grammy0 = 1)
+
+# wrangle joined df
+combined_df <- spotify60yr %>% 
+  left_join(matches, by =c("track" = "track", 
+                                         "artist" = "artist")) %>%
+  mutate(grammy = if_else(is.na(grammy0), 0, 1)) %>%
+  select(-uri, -grammy0) %>% rename(billboard = target)
+
+# add artist metadata
+genres_df <- combined_df %>% 
+  inner_join(artist_df, by = c("artist" = "Artist")) %>%
+  mutate(is_male = as.numeric((Gender == "M")),
+         is_group = as.numeric((Group.Solo == "Group")),
+         years_since_1st_album = (2021-YearFirstAlbum)) %>%
+  select(-Gender,-X,-Gender,-Group.Solo, -YearFirstAlbum)
+
+combined_with_metadata = genres_df %>% select(-Genres,-artist,-track) %>%
+  drop_na()
+
+combined_df = combined_df %>% select(-artist,-track)
+
+```
+```{r spotify-wrangle1, echo=FALSE, cache = TRUE, eval=FALSE}
+# obtain tibbles with artist metadata for analysis with num streams as response
+complete_artist_data <- spotify60yr %>% inner_join(artist_df, 
+                                                   by = c("artist" = "Artist"))
+
+global_spotify_metadata <- spotify_global %>%
+  inner_join(complete_artist_data, by = c("title" = "track",
+                                          "artist" = "artist")) %>% drop_na()
+```
+```{r spotify-wrangle-metadata, echo=FALSE, eval=FALSE}
+# obtain the number of days each song had over 1M global streams
+days_over_1M <- global_spotify_metadata %>% 
+  transmute(title = factor(title),
+            artist = factor(artist),
+            streams = streams,
+            day = if_else(streams > 1000000, 1, 0)) %>%
+  group_by(title, artist) %>% 
+  summarise(days = sum(day)) %>% 
+  ungroup()
+
+```
+```{r spotify-wrangle-nometa, echo=FALSE, eval=FALSE}
+# add song-level features
+streams_no_metadata <- spotify60yr %>% 
+  inner_join(spotify_global,by = c("track" = "title", "artist" = "artist")) %>%
+  drop_na()
+
+# repeat the calculation of days, but with the artist metadata this time
+days_over_1M_nometa <- streams_no_metadata %>% 
+  transmute(title = factor(track),
+            artist = factor(artist),
+            streams = streams,
+            day = if_else(streams > 1000000, 1, 0)) %>%
+  group_by(title, artist) %>% 
+  summarise(days = sum(day)) %>%
+  ungroup()
+```
+```{r spotify-final-wrangle, echo=FALSE, eval=FALSE}
+# get sum of streams for each song
+global_spotify_metadata <- global_spotify_metadata %>% 
+  mutate(is_male = as.numeric((Gender == "M")),
+         is_group = as.numeric((Group.Solo == "Group")),
+         years_since_1st_album = (2021-YearFirstAlbum))  %>%
+  group_by(title, artist, danceability, energy, loudness, mode, speechiness,
+                            acousticness, instrumentalness, liveness, valence, tempo, duration_ms, time_signature,
+                            chorus_hit, sections, Followers, NumAlbums, is_male, is_group, years_since_1st_album) %>%
+  summarise(streams = sum(streams)) %>% ungroup() %>% select(-streams)
+
+# filter by criterion, over 14 days with over 1M streams
+streams_metadata_target <- days_over_1M %>% mutate(streams_achieved = if_else(days > 14,1,0)) %>%
+  inner_join(global_spotify_metadata, by = c("title" = "title", "artist" = "artist")) %>% 
+  ungroup() %>% select(-title,-artist,-days)
+
+
+
+# repeat for data without artist metadata
+global_spotify_no_metadata <- streams_no_metadata %>% 
+  group_by(track, artist, danceability, energy, loudness, mode, speechiness,
+                            acousticness, instrumentalness, liveness, valence, tempo, duration_ms, time_signature,
+                            chorus_hit, sections) %>%
+  summarise(streams = sum(streams)) %>% ungroup() %>% select(-streams)
+
+streams_no_metadata_target <- days_over_1M_nometa %>% mutate(streams_achieved = if_else(days > 14,1,0)) %>%
+  left_join(global_spotify_no_metadata, by = c("title" = "track", "artist" = "artist")) %>%
+  select(-title, -artist, -days)
+```
+```{r data-per-method-calculations, echo=FALSE, eval=FALSE}
+# calculate tibble to see how many observations there are for each test
+num_grammy <- combined_df %>% summarise(count = sum(grammy)) %>% pull(count)
+num_billboard <- combined_df %>% summarise(count = sum(billboard)) %>% pull(count)
+grammy_metadata <- combined_with_metadata %>% summarise(count = sum(grammy)) %>% pull(count)
+billboard_metadata <- combined_with_metadata %>% summarise(count = sum(billboard)) %>% pull(count)
+num_streams_meta <- streams_metadata_target %>% ungroup() %>% 
+  summarise(count = sum(streams_achieved)) %>% pull(count)
+num_streams_nometa <- streams_no_metadata_target %>% ungroup() %>% 
+  summarise(count = sum(streams_achieved)) %>% pull(count)
+
+data_imbalance_tibble <- tibble(total_songs = c(nrow(combined_df), nrow(combined_df),
+                       nrow(combined_with_metadata), nrow(combined_with_metadata),
+                       nrow(streams_metadata_target), nrow(streams_no_metadata_target)),
+       award = c("grammy", "billboard",
+                 "grammy", "billboard", 
+                 ">14 days with over 1M streams", ">14 days with over 1M streams"),
+       metadata_included = c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE),
+       awards_given = c(num_grammy, num_billboard,grammy_metadata,billboard_metadata,
+                        num_streams_meta, num_streams_nometa),
+       prc_total = c(num_grammy/nrow(combined_df), num_billboard/nrow(combined_df),
+                     grammy_metadata/nrow(combined_with_metadata), 
+                     billboard_metadata/nrow(combined_with_metadata),
+                     num_streams_meta/nrow(streams_metadata_target),
+                     num_streams_nometa/nrow(streams_no_metadata_target)))
+write.table(data_imbalance_tibble, file="data_imbalance_tibble")
+```
+
+
+```{r train-test-nometa, echo=FALSE, eval=FALSE}
+# billboard train/validation split
+n = nrow(combined_df)
+set.seed(10)
+billboard_samples = sample(1:n, 0.8*n)
+
+billboard_train <- combined_df %>% filter(row_number() %in% billboard_samples) %>% 
+  select(-grammy)
+billboard_test <- combined_df %>% filter(!(row_number() %in% billboard_samples)) %>% 
+  select(-grammy)
+
+# because there are so few grammy awards in the data, 
+# we have to ensure the minority class is properly distributed
+
+grammy_data = combined_df %>% filter(grammy == 1) %>% select(-billboard)
+non_grammy_data = combined_df %>% filter(grammy == 0) %>% select(-billboard)
+set.seed(10)
+grammy_train_indices = sample(1:nrow(grammy_data), 0.7*nrow(grammy_data))
+set.seed(10)
+non_grammy_train_indices = sample(1:nrow(non_grammy_data), 1500)
+non_grammy_test_indices = sample((1:nrow(non_grammy_data))[-non_grammy_train_indices], 500)
+
+grammy_for_train <- grammy_data %>% filter((row_number() %in% 
+                                                         grammy_train_indices))
+grammy_for_test <- grammy_data %>% filter(!(row_number() %in% 
+                                                         grammy_train_indices))
+
+grammy_train = bind_rows(grammy_for_train,grammy_for_train,
+                         (non_grammy_data %>% filter((row_number() %in% 
+                                                         non_grammy_train_indices))))
+grammy_test = bind_rows(grammy_for_test,grammy_for_test,
+                         (non_grammy_data %>% filter((row_number() %in% 
+                                                         non_grammy_test_indices))))
+
+
+# train/validation split with streaming as target
+
+n = nrow(streams_no_metadata_target)
+set.seed(2)
+streams_samples = sample(1:n, 0.8*n)
+
+streams_train <- streams_no_metadata_target %>% 
+  ungroup() %>%
+  filter(row_number() %in% streams_samples) 
+streams_test <- streams_no_metadata_target %>% 
+  ungroup() %>%
+  filter(!(row_number() %in% streams_samples)) 
+
+```
+```{r train-test-meta, echo=FALSE, eval=FALSE}
+# again, ensure proper distribution of minority class among train/validation data
+billboard_data = combined_with_metadata %>% drop_na() %>% filter(billboard == 1) %>% select(-grammy)
+non_billboard_data = combined_with_metadata %>% drop_na() %>% filter(billboard == 0) %>% select(-grammy)
+set.seed(3)
+non_billboard_train_indices = sample(1:nrow(non_billboard_data), 0.8*nrow(non_billboard_data))
+set.seed(10)
+billboard_train_indices = sample(1:nrow(billboard_data), 3000)
+billboard_test_indices = sample((1:nrow(billboard_data))[-billboard_train_indices], 1000)
+
+
+
+non_billboard_meta_for_train <- non_billboard_data %>% filter((row_number() %in% 
+                                                         non_billboard_train_indices))
+non_billboard_meta_for_test <- non_billboard_data %>% filter(!(row_number() %in% 
+                                                         non_billboard_train_indices))
+
+billboard_metadata_train = bind_rows(non_billboard_meta_for_train,non_billboard_meta_for_train,
+                         (billboard_data %>% filter((row_number() %in% 
+                                                         billboard_train_indices))))
+billboard_metadata_test = bind_rows(non_billboard_meta_for_test,non_billboard_meta_for_test,
+                         (billboard_data %>% filter(!(row_number() %in% 
+                                                         billboard_train_indices))))
+# repeat the ensuring of good proportions of minority class in train/validation data
+
+grammy_data = combined_with_metadata %>% filter(grammy == 1) %>% select(-billboard)
+non_grammy_data = combined_with_metadata %>% filter(grammy == 0) %>% select(-billboard)
+set.seed(10)
+grammy_train_indices = sample(1:nrow(grammy_data), 0.8*nrow(grammy_data))
+set.seed(10)
+non_grammy_train_indices = sample(1:nrow(non_grammy_data), 1000)
+non_grammy_test_indices = sample((1:nrow(non_grammy_data))[-non_grammy_train_indices], 300)
+
+grammy_meta_for_train <- grammy_data %>% filter((row_number() %in% 
+                                                         grammy_train_indices))
+grammy_meta_for_test <- grammy_data %>% filter(!(row_number() %in% 
+                                                         grammy_train_indices))
+
+grammy_metadata_train = bind_rows(grammy_meta_for_train, grammy_meta_for_train,
+                         (non_grammy_data %>% filter((row_number() %in% 
+                                                         non_grammy_train_indices))))
+grammy_metadata_test = bind_rows(grammy_meta_for_test, grammy_meta_for_test,
+                         (non_grammy_data %>% filter((row_number() %in% 
+                                                         non_grammy_test_indices))))
+
+
+# train/validation split with streams as response variable
+
+n = nrow(streams_metadata_target)
+set.seed(10)
+streams_samples = sample(1:n, 0.8*n)
+
+streams_metadata_train <- streams_metadata_target %>% 
+  filter(row_number() %in% streams_samples)
+streams_metadata_test <- streams_metadata_target %>% 
+  filter(!(row_number() %in% streams_samples))
+
+```
+
+
+
+```{r logit-nometa, echo=FALSE, cache = TRUE, eval=FALSE}
+# generate logistic regression models for three different response variables
+# use data without artist metadata
+glmnet_grammy <- glm(grammy ~ ., family = "binomial", data = grammy_train)
+glmnet_billboard <- glm(billboard ~ ., family = "binomial", data = billboard_train)
+glmnet_streams <- glm(streams_achieved ~ ., family = "binomial", data = streams_train)
+
+```
+```{r logit-coefs-ranking-nometa, echo=FALSE, eval=FALSE}
+# extract coefficients from the glmnet()'s
+grammy_coefs <- tibble(names = factor(names(glmnet_grammy$coefficients)),
+             coefs = glmnet_grammy$coefficients) %>% 
+  mutate(target = factor("grammy"))
+billboard_coefs <- tibble(names = factor(names(glmnet_billboard$coefficients)),
+             coefs = glmnet_billboard$coefficients) %>% 
+  mutate(target = factor("billboard"))
+streams_coefs <- tibble(names = factor(names(glmnet_streams$coefficients)),
+             coefs = glmnet_streams$coefficients) %>%
+  mutate(target = factor("streams"))
+
+# ranking of importance of coefficients
+grammy_coefs_ranked = grammy_coefs %>% filter(!(names == "(Intercept)")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(grammy_coefs)[1]-1))) %>% 
+  transmute(names = names, grammy_ranking = rank)
+billboard_coefs_ranked = billboard_coefs %>% filter(!(names == "(Intercept)"),
+                                                    !(names == "time_signature0")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(billboard_coefs)[1]-2))) %>% 
+  transmute(names = names, billboard_ranking = rank) 
+streams_coefs_ranked = streams_coefs %>% filter(!(names == "(Intercept)")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(streams_coefs)[1]-1))) %>% 
+  transmute(names = names, streams_ranking = rank) 
+
+# join the rankings in one tibble
+ranking_joined <- grammy_coefs_ranked %>% 
+  inner_join(billboard_coefs_ranked, by = c("names" = "names")) %>%
+  inner_join(streams_coefs_ranked, by = c("names" = "names"))
+
+# calculate variable of rankings
+ranking_joined$ranking_variance = 
+  rowVars(as.matrix(ranking_joined %>% select(-names)))
+
+# add coefficient names to final tibble
+rankings_logit <- tibble(rank = c(1:length(grammy_coefs_ranked$names)),
+       grammy_ranking = grammy_coefs_ranked$names,
+       billboard_ranking = billboard_coefs_ranked$names,
+       streams_ranking = streams_coefs_ranked$names)
+
+# generate summary tibble with rankings, absolute coefficients, and variances
+# among different response variables
+logit_nometa_summary_tibble <- bind_rows(grammy_coefs, billboard_coefs, streams_coefs) %>% 
+  pivot_wider(names_from = target, values_from = coefs) %>%
+  inner_join(ranking_joined, by = c("names" = "names"))
+logit_nometa_summary_tibble$absolute_variance = 
+  rowVars(as.matrix(logit_nometa_summary_tibble %>% select(grammy, billboard, streams)))
+logit_nometa_summary_tibble = logit_nometa_summary_tibble %>%
+  mutate(mean_ranking = (grammy_ranking+billboard_ranking+streams_ranking)/3)
+
+write.table(logit_nometa_summary_tibble, file="logit_nometa_summary_tibble")
+```
+```{r logit-meta, echo=FALSE, cache = TRUE, eval=FALSE}
+# run logistic regression on data with artist metadata
+glmnet_grammy_meta <- glm(grammy ~ ., family = "binomial", data = grammy_metadata_train)
+glmnet_billboard_meta <- glm(billboard ~ ., family = "binomial", data = billboard_metadata_train)
+glmnet_streams_meta <- glm(streams_achieved ~ ., family = "binomial", data = streams_metadata_train)
+
+```
+```{r logit-meta-coefs, echo=FALSE, eval=FALSE}
+# extract coefficients
+grammy_coefs <- tibble(names = factor(names(glmnet_grammy_meta$coefficients)),
+             coefs = glmnet_grammy_meta$coefficients) %>% 
+  mutate(target = factor("grammy"))
+billboard_coefs <- tibble(names = factor(names(glmnet_billboard_meta$coefficients)),
+             coefs = glmnet_billboard_meta$coefficients) %>% 
+  mutate(target = factor("billboard"))
+streams_coefs <- tibble(names = factor(names(glmnet_streams_meta$coefficients)),
+             coefs = glmnet_streams_meta$coefficients) %>%
+  mutate(target = factor("streams")) %>%
+  add_row(names = "time_signature1", coefs = 0, target = "streams")
+
+# ranking of importance of coefficients
+grammy_coefs_ranked = grammy_coefs %>% filter(!(names == "(Intercept)")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(grammy_coefs)[1]-1))) %>% 
+  transmute(names = names, grammy_ranking = rank)
+billboard_coefs_ranked = billboard_coefs %>% filter(!(names == "(Intercept)")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(billboard_coefs)[1]-1))) %>% 
+  transmute(names = names, billboard_ranking = rank) 
+streams_coefs_ranked = streams_coefs %>% filter(!(names == "(Intercept)")) %>% 
+  arrange(desc(abs(coefs))) %>% mutate(rank = c(1:(dim(streams_coefs)[1]-1))) %>% 
+  transmute(names = names, streams_ranking = rank) 
+
+# join the rankings into one table
+ranking_joined <- grammy_coefs_ranked %>% 
+  inner_join(billboard_coefs_ranked, by = c("names" = "names")) %>%
+  inner_join(streams_coefs_ranked, by = c("names" = "names"))
+ranking_joined$ranking_variance = 
+  rowVars(as.matrix(ranking_joined %>% select(-names)))
+
+# final tibble with importance ranking and variable names
+rankings_logit <- tibble(rank = c(1:length(grammy_coefs_ranked$names)),
+       grammy_ranking = grammy_coefs_ranked$names,
+       billboard_ranking = billboard_coefs_ranked$names,
+       streams_ranking = streams_coefs_ranked$names)
+
+# generate final summary tibble with rankings, absolute coefficients
+# and variances of coefficients/rankings among the different models
+logit_meta_summary_tibble <- bind_rows(grammy_coefs, billboard_coefs, streams_coefs) %>% 
+  transmute(names = factor(names), coefs =as.numeric(coefs), target = factor(target)) %>%
+  pivot_wider(names_from = target, values_from = coefs, values_fn = sum) %>%
+  mutate(billboard = replace_na(billboard, 0)) %>%
+  inner_join(ranking_joined, by = c("names" = "names"))
+logit_meta_summary_tibble$absolute_variance = 
+  rowVars(as.matrix(logit_meta_summary_tibble %>% select(grammy, billboard, streams)))
+logit_meta_summary_tibble <- logit_meta_summary_tibble %>%
+  mutate(mean_ranking = (grammy_ranking + billboard_ranking + streams_ranking)/3)
+
+write.table(logit_meta_summary_tibble, file="logit_meta_summary_tibble")
+```
+
+
+```{r create-cv-tree, echo=FALSE, cache = FALSE, eval=FALSE}
+# create decision trees 
+
+# trees without metadata
+billboard_tree <- 
+  tree(billboard ~ ., 
+#       control = tree.control(nobs = dim(billboard_train)[1],mincut = 0, minsize = 0, mindev = 0),
+       data = billboard_train)
+grammy_tree <- 
+  tree(grammy ~ ., 
+#       control = tree.control(nobs = dim(grammy_train)[1],mincut = 0, minsize = 0, mindev = 0),
+       data = grammy_train)
+streams_tree <- 
+  tree(streams_achieved ~ .,
+#       tree.control(nobs = dim(streams_train)[1]*.7,mincut = 0, minsize = 0, mindev = 0),
+       data = streams_train)
+
+# trees with metadata
+billboard_metadata_tree <- 
+  tree(billboard ~ ., 
+#       control = tree.control(nobs = dim(billboard_metadata_train)[1],mincut = 0, minsize = 0, mindev = 0),
+       data = billboard_metadata_train)
+grammy_metadata_tree <- 
+  tree(grammy ~ ., 
+#       control = tree.control(nobs = dim(grammy_metadata_train)[1],mincut = 0, minsize = 0, mindev = 0),
+       data = grammy_metadata_train)
+streams_metadata_tree <- 
+  tree(streams_achieved ~ ., 
+#       tree.control(nobs = dim(streams_metadata_train)[1]*.7,mincut = 0, minsize = 0, mindev = 0),
+       data = streams_metadata_train)
+
+# Obtain optimal parameter size through CV
+cv.billboard_tree <- cv.tree(billboard_tree)
+cv.billboard_tree_size <- tibble(tree_size = unlist(cv.billboard_tree$size),
+                    CV_error = unlist(cv.billboard_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+cv.grammy_tree <- cv.tree(grammy_tree)
+cv.grammy_tree_size <- tibble(tree_size = unlist(cv.grammy_tree$size),
+                    CV_error = unlist(cv.grammy_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+cv.streams_tree <- cv.tree(streams_tree)
+cv.streams_tree_size <- tibble(tree_size = unlist(cv.streams_tree$size),
+                    CV_error = unlist(cv.streams_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+
+cv.billboard_metadata_tree <- cv.tree(billboard_metadata_tree)
+cv.billboard_metadata_tree_size <- tibble(tree_size = unlist(cv.billboard_metadata_tree$size),
+                    CV_error = unlist(cv.billboard_metadata_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+cv.grammy_metadata_tree <- cv.tree(grammy_metadata_tree)
+cv.grammy_metadata_tree_size <- tibble(tree_size = unlist(cv.grammy_metadata_tree$size),
+                    CV_error = unlist(cv.grammy_metadata_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+cv.streams_metadata_tree <- cv.tree(streams_metadata_tree)
+cv.streams_metadata_tree_size <- tibble(tree_size = unlist(cv.streams_metadata_tree$size),
+                    CV_error = unlist(cv.streams_metadata_tree$dev)) %>% 
+  arrange(CV_error) %>% head(1) %>% pull(tree_size)
+
+```
+```{r prune-tree, echo=FALSE, cache=TRUE, eval=FALSE}
+# prune trees using the optimal size obtained through CV
+pruned_grammy_tree <- prune.tree(grammy_tree, best = cv.grammy_tree_size+1)
+pruned_billboard_tree <- prune.tree(billboard_tree, best = cv.billboard_tree_size)
+pruned_streams_tree <- prune.tree(streams_tree, best = cv.streams_tree_size)
+
+pruned_grammy_metadata_tree <- prune.tree(grammy_metadata_tree, best = cv.grammy_metadata_tree_size)
+pruned_billboard_metadata_tree <- prune.tree(billboard_metadata_tree, best = cv.billboard_metadata_tree_size)
+pruned_streams_metadata_tree <- prune.tree(streams_metadata_tree, best = cv.streams_metadata_tree_size)
+
+# compare tree sizes of different models
+decision_tree_sizes <- tibble(metadata = c("without metadata", "with metadata"),
+       grammy = c(cv.grammy_tree_size, cv.grammy_metadata_tree_size),
+       billboard = c(cv.billboard_tree_size, cv.billboard_metadata_tree_size),
+       streams = c(cv.streams_tree_size, cv.streams_metadata_tree_size)) 
+
+write.table(decision_tree_sizes, file="decision_tree_sizes")
+```
+
+
+```{r create-tune-RF, echo=FALSE, cache=TRUE, eval=FALSE}
+# extract data as matrix
+Xgrammy_nometa <- model.matrix(grammy~., as.data.frame(grammy_train))[,-1]
+Xbillboard_nometa <- model.matrix(billboard~., as.data.frame(billboard_train))[,-1]
+Xstreams_nometa <- model.matrix(streams_achieved~., as.data.frame(streams_train))[,-1]
+
+Xgrammy_meta <- model.matrix(grammy~., as.data.frame(grammy_metadata_train))[,-1]
+Xbillboard_meta <- model.matrix(billboard~., as.data.frame(billboard_metadata_train))[,-1]
+Xstreams_meta <- model.matrix(streams_achieved~., as.data.frame(streams_metadata_train))[,-1]
+
+Ygrammy_nometa <- grammy_train$grammy
+Ybillboard_nometa <- billboard_train$billboard
+Ystreams_nometa <- streams_train$streams_achieved
+
+Ygrammy_meta <- grammy_metadata_train$grammy
+Ybillboard_meta <- billboard_metadata_train$billboard
+Ystreams_meta <- streams_metadata_train$streams_achieved
+
+# obtain optimal mtry for each model
+set.seed(11)
+tune_grammy_nometa <- tuneRF(x = Xgrammy_nometa, y = Ygrammy_nometa,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+set.seed(11)
+tune_billboard_nometa <- tuneRF(x = Xbillboard_nometa, y = Ybillboard_nometa,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+set.seed(11)
+tune_streams_nometa <- tuneRF(x = Xstreams_nometa, y = Ystreams_nometa,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+set.seed(11)
+tune_grammy_meta <- tuneRF(x = Xgrammy_meta, y = Ygrammy_meta,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+set.seed(11)
+tune_billboard_meta <- tuneRF(x = Xbillboard_meta, y = Ybillboard_meta,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+set.seed(11)
+tune_streams_meta <- tuneRF(x = Xstreams_meta, y = Ystreams_meta,
+                  plot=FALSE, trace=FALSE, doBest=TRUE)
+
+
+rf_tune_tibble = tibble(
+  rf_obj = c("grammy_nometa", "billboard_nometa", "streams_nometa",
+             "grammy_meta", "billboard_meta", "streams_meta"),
+  mtry = c(tune_grammy_nometa$mtry, tune_billboard_nometa$mtry, tune_streams_nometa$mtry,
+             tune_grammy_meta$mtry, tune_billboard_meta$mtry, tune_streams_meta$mtry)
+)
+write.table(rf_tune_tibble, file = "rf_tune_tibble")
+
+```
+```{r final-random-forest, echo=FALSE, eval=FALSE}
+rf_tune_tibble = read.table("rf_tune_tibble")
+
+# generate final random forest models
+set.seed(11)
+RF_grammy_nometa <- randomForest(grammy ~., 
+                                 grammy_train, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "grammy_nometa") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+
+# extract subset of data since this dataset is so large and balanced
+set.seed(11)
+subset_indices <- sample(1:nrow(billboard_train), 4000)
+billboard_train_subset <- billboard_train %>% 
+  filter(row_number() %in% subset_indices)
+set.seed(11)
+RF_billboard_nometa <- randomForest(billboard ~., 
+                                 billboard_train_subset, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "billboard_nometa") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+
+set.seed(11)
+RF_streams_nometa <- randomForest(streams_achieved ~., 
+                                 streams_train, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "streams_nometa") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+
+set.seed(11)
+RF_grammy_meta <- randomForest(grammy ~., 
+                                 grammy_metadata_train, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "grammy_meta") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+set.seed(11)
+RF_billboard_meta <- randomForest(billboard ~., 
+                                 billboard_metadata_train, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "billboard_meta") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+set.seed(11)
+RF_streams_meta <- randomForest(streams_achieved ~., 
+                                 streams_metadata_train, 
+                                 mtry = rf_tune_tibble %>%
+                                   filter(rf_obj == "streams_meta") %>%
+                                   pull(mtry),
+                                 importance = FALSE,
+                                 ntree = 500)
+
+
+```
+```{r nometa-purity-ranking, echo=FALSE, eval=FALSE}
+# no metadata ranking of variable importance in random forest models
+# generate rankings for each model
+grammy_nometa_purity_ranking <- 
+  bind_cols((tibble(names = rownames(tune_grammy_nometa$importance),
+                    grammy_importance = as.numeric(tune_grammy_nometa$importance)) %>% 
+               arrange(desc(grammy_importance))), 
+            grammy_rank = c(1:length(tune_grammy_nometa$importance)))
+billboard_nometa_purity_ranking <- 
+  bind_cols((tibble(billboard_names = rownames(tune_billboard_nometa$importance),
+                    billboard_importance = as.numeric(tune_billboard_nometa$importance)) %>% 
+               arrange(desc(billboard_importance))), 
+            billboard_rank = c(1:length(tune_billboard_nometa$importance)))
+streams_nometa_purity_ranking <- 
+  bind_cols((tibble(streams_names = rownames(tune_streams_nometa$importance),
+                    streams_importance = as.numeric(tune_streams_nometa$importance)) %>% 
+               arrange(desc(streams_importance))), 
+            streams_rank = c(1:length(tune_streams_nometa$importance)))
+
+# combine tibbles
+nometa_purity_combined <- grammy_nometa_purity_ranking %>%
+  inner_join(billboard_nometa_purity_ranking, 
+             by = c("names" = "billboard_names")) %>%
+  inner_join(streams_nometa_purity_ranking, 
+             by = c("names" = "streams_names"))
+
+# get row variance
+nometa_purity_rankingvar <- rowVars(as.matrix(nometa_purity_combined %>%
+  select(grammy_rank, billboard_rank, streams_rank)))
+nometa_purity_absolutevar <- rowVars(as.matrix(nometa_purity_combined %>%
+  select(grammy_importance, billboard_importance, streams_importance)))
+
+# compute final ranking tibble
+nometa_purity_combined <- 
+  bind_cols(nometa_purity_combined,
+            ranking_variance = nometa_purity_rankingvar,
+            importance_variance = nometa_purity_absolutevar)
+
+```
+```{r meta-purity-ranking, echo=FALSE, eval=FALSE}
+# obtain variable importance for the random forest models with metadata
+# obtain model specific rankings
+grammy_meta_purity_ranking <- 
+  bind_cols((tibble(names = rownames(tune_grammy_meta$importance),
+                    grammy_importance = as.numeric(tune_grammy_meta$importance)) %>% 
+               arrange(desc(grammy_importance))), 
+            grammy_rank = c(1:length(tune_grammy_meta$importance)))
+billboard_meta_purity_ranking <- 
+  bind_cols((tibble(billboard_names = rownames(tune_billboard_meta$importance),
+                    billboard_importance = as.numeric(tune_billboard_meta$importance)) %>% 
+               arrange(desc(billboard_importance))), 
+            billboard_rank = c(1:length(tune_billboard_meta$importance)))
+streams_meta_purity_ranking <- 
+  bind_cols((tibble(streams_names = rownames(tune_streams_meta$importance),
+                    streams_importance = as.numeric(tune_streams_meta$importance)) %>% 
+               arrange(desc(streams_importance))), 
+            streams_rank = c(1:length(tune_streams_meta$importance)))
+
+# combine tibbles
+meta_purity_combined <- grammy_meta_purity_ranking %>%
+  inner_join(billboard_meta_purity_ranking, 
+             by = c("names" = "billboard_names")) %>%
+  inner_join(streams_meta_purity_ranking, 
+             by = c("names" = "streams_names")) %>%
+  mutate(mean_ranking = (billboard_rank + grammy_rank + streams_rank)/3)
+
+# get row variance
+meta_purity_rankingvar <- rowVars(as.matrix(meta_purity_combined %>%
+  select(grammy_rank, billboard_rank, streams_rank)))
+meta_purity_absolutevar <- rowVars(as.matrix(meta_purity_combined %>%
+  select(grammy_importance, billboard_importance, streams_importance)))
+
+# combine for final summary tibble
+nometa_purity_combined <- 
+  bind_cols(nometa_purity_combined,
+            ranking_variance = nometa_purity_rankingvar,
+            importance_variance = nometa_purity_absolutevar) %>%
+  mutate(mean_ranking = (billboard_rank + grammy_rank + streams_rank)/3)
+
+write.table(nometa_purity_combined, file = "nometa_purity_combined")
+write.table(meta_purity_combined, file = "meta_purity_combined")
+```
+
+
+
+```{r boost-param-grid, echo=FALSE, eval=FALSE}
+
+# create grids of paraemters to try
+grammy_nometa_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(3:8), # this model benefits from large tree size
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+billboard_nometa_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(3:8), # this model benefits from large tree size
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+streams_nometa_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(1:6), #default values for tree size, not special
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+
+grammy_meta_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(2:6), #default values for tree size, not special
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+billboard_meta_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(1:6), #default values for tree size, not special
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+streams_meta_param_grid <- expand.grid(
+  shrinkage = c(.01), #default values for learning rate, not special
+  interaction.depth = c(1:6), #default values for tree size, not special
+  optimal_trees = 0,               # a place to dump results
+  min_deviance = 0                     # a place to dump results
+)
+
+# total number of combinations
+n = nrow(grammy_nometa_param_grid)
+```
+```{r boost-nometa-param-results, echo=FALSE, cache = TRUE, eval = FALSE}
+# find optimal number of trees and tree size for each model through CV
+
+for(i in 1:nrow(grammy_nometa_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = grammy ~ .,
+    distribution = "bernoulli",
+    data = grammy_train,
+    n.trees = 10000,
+    interaction.depth = grammy_nometa_param_grid$interaction.depth[i],
+    shrinkage = grammy_nometa_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  grammy_nometa_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  grammy_nometa_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+set.seed(23)
+subset_indices <- sample(1:nrow(billboard_train), 4000)
+billboard_train_subset <- billboard_train %>% 
+  filter(row_number() %in% subset_indices)
+for(i in 1:nrow(billboard_nometa_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = billboard ~ .,
+    distribution = "bernoulli",
+    data = billboard_train_subset,
+    n.trees = 5000,
+    interaction.depth = billboard_nometa_param_grid$interaction.depth[i],
+    shrinkage = billboard_nometa_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  billboard_nometa_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  billboard_nometa_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+for(i in 1:nrow(streams_nometa_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = streams_achieved ~ .,
+    distribution = "bernoulli",
+    data = streams_train,
+    n.trees = 1000,
+    interaction.depth = streams_nometa_param_grid$interaction.depth[i],
+    shrinkage = streams_nometa_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  streams_nometa_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  streams_nometa_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+```
+```{r boost-meta-param-results, echo=FALSE, cache = TRUE, eval = FALSE}
+# repeat parameter tuning for the data with artist metadata
+
+for(i in 1:nrow(grammy_meta_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = grammy ~ .,
+    distribution = "bernoulli",
+    data = grammy_metadata_train,
+    n.trees = 7000,
+    interaction.depth = grammy_meta_param_grid$interaction.depth[i],
+    shrinkage = grammy_meta_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  grammy_meta_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  grammy_meta_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+for(i in 1:nrow(billboard_meta_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = billboard ~ .,
+    distribution = "bernoulli",
+    data = billboard_metadata_train,
+    n.trees = 3000,
+    interaction.depth = billboard_nometa_param_grid$interaction.depth[i],
+    shrinkage = billboard_nometa_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  billboard_meta_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  billboard_meta_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+
+for(i in 1:nrow(streams_nometa_param_grid)) {
+  # reproducibility
+  set.seed(12)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = streams_achieved ~ .,
+    distribution = "bernoulli",
+    data = streams_metadata_train,
+    n.trees = 1000,
+    interaction.depth = streams_meta_param_grid$interaction.depth[i],
+    shrinkage = streams_meta_param_grid$shrinkage[i],
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  streams_meta_param_grid$optimal_trees[i] = which.min(gbm.tune$cv.error)
+  streams_meta_param_grid$min_deviance[i] = min(gbm.tune$cv.error)
+}
+
+
+write.table(grammy_nometa_param_grid, file = "grammy_nometa_param_grid")
+write.table(billboard_nometa_param_grid, file = "billboard_nometa_param_grid")
+write.table(streams_nometa_param_grid, file = "streams_nometa_param_grid")
+write.table(grammy_meta_param_grid, file = "grammy_meta_param_grid")
+write.table(billboard_meta_param_grid, file = "billboard_meta_param_grid")
+write.table(streams_meta_param_grid, file = "streams_meta_param_grid")
+
+# grammy_meta_param_grid
+# billboard_meta_param_grid
+# streams_meta_param_grid
+```
+```{r tuned-boosted-models, echo=FALSE, cache = TRUE, eval=FALSE}
+grammy_nometa_param_grid = read.table("grammy_nometa_param_grid")
+billboard_nometa_param_grid = read.table("billboard_nometa_param_grid")
+streams_nometa_param_grid = read.table("streams_nometa_param_grid")
+grammy_meta_param_grid = read.table("grammy_meta_param_grid")
+billboard_meta_param_grid = read.table("billboard_meta_param_grid")
+streams_meta_param_grid = read.table("streams_meta_param_grid")
+
+# generate tuned boosted classification models
+set.seed(123)
+gbm_grammy_nometa <- gbm(
+    formula = grammy ~ .,
+    distribution = "bernoulli",
+    data = grammy_train,
+    n.trees = 
+      grammy_nometa_param_grid$optimal_trees[which.min(grammy_nometa_param_grid$min_deviance)],
+    interaction.depth = 
+       grammy_nometa_param_grid$interaction.depth[which.min(grammy_nometa_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+set.seed(123)
+gbm_billboard_nometa <- gbm(
+    formula = billboard ~ .,
+    distribution = "bernoulli",
+    data = billboard_train,
+    n.trees = 
+      billboard_nometa_param_grid$optimal_trees[which.min(billboard_nometa_param_grid$min_deviance)],
+    interaction.depth = 
+       billboard_nometa_param_grid$interaction.depth[which.min(billboard_nometa_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+set.seed(123)
+gbm_streams_nometa <- gbm(
+    formula = streams_achieved ~ .,
+    distribution = "bernoulli",
+    data = streams_train,
+    n.trees = 
+      streams_nometa_param_grid$optimal_trees[which.min(streams_nometa_param_grid$min_deviance)],
+    interaction.depth = 
+       streams_nometa_param_grid$interaction.depth[which.min(streams_nometa_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+
+
+# get boosted models
+set.seed(123)
+gbm_grammy_meta <- gbm(
+    formula = grammy ~ .,
+    distribution = "bernoulli",
+    data = grammy_metadata_train,
+    n.trees = 
+      grammy_meta_param_grid$optimal_trees[which.min(grammy_meta_param_grid$min_deviance)],
+    interaction.depth = 
+       grammy_meta_param_grid$interaction.depth[which.min(grammy_meta_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+set.seed(123)
+gbm_billboard_meta <- gbm(
+    formula = billboard ~ .,
+    distribution = "bernoulli",
+    data = billboard_metadata_train,
+    n.trees = 
+      billboard_meta_param_grid$optimal_trees[which.min(billboard_meta_param_grid$min_deviance)],
+    interaction.depth = 
+       billboard_meta_param_grid$interaction.depth[which.min(billboard_meta_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+set.seed(123)
+gbm_streams_meta <- gbm(
+    formula = streams_achieved ~ .,
+    distribution = "bernoulli",
+    data = streams_metadata_train,
+    n.trees = 
+      streams_meta_param_grid$optimal_trees[which.min(streams_meta_param_grid$min_deviance)],
+    interaction.depth = 
+       streams_meta_param_grid$interaction.depth[which.min(streams_meta_param_grid$min_deviance)],
+    shrinkage = 0.01,
+    cv.folds = 5,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+
+```
+```{r boosted-var-importance, echo=FALSE, eval=FALSE}
+# var importance for the boosted models
+
+
+# extract model-specific values for models without artist metadata
+grammy_nometa_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_grammy_nometa)$var,
+         grammy_rank = c(1:length(summary.gbm(gbm_grammy_nometa)$var)),
+         grammy_importance = summary.gbm(gbm_grammy_nometa)$rel.inf)
+billboard_nometa_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_billboard_nometa)$var,
+         billboard_rank = c(1:length(summary.gbm(gbm_billboard_nometa)$var)),
+         billboard_importance = summary.gbm(gbm_billboard_nometa)$rel.inf)
+streams_nometa_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_streams_nometa)$var,
+         streams_rank = c(1:length(summary.gbm(gbm_streams_nometa)$var)),
+         streams_importance = summary.gbm(gbm_streams_nometa)$rel.inf)
+# extract model-specific values for models with artist metadata
+grammy_meta_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_grammy_meta)$var,
+         grammy_rank = c(1:length(summary.gbm(gbm_grammy_meta)$var)),
+         grammy_importance = summary.gbm(gbm_grammy_meta)$rel.inf)
+billboard_meta_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_billboard_meta)$var,
+         billboard_rank = c(1:length(summary.gbm(gbm_billboard_meta)$var)),
+         billboard_importance = summary.gbm(gbm_billboard_meta)$rel.inf)
+streams_meta_boosted_ranking <- 
+  tibble(names = summary.gbm(gbm_streams_meta)$var,
+         streams_rank = c(1:length(summary.gbm(gbm_streams_meta)$var)),
+         streams_importance = summary.gbm(gbm_streams_meta)$rel.inf)
+
+
+# combine tibbles
+nometa_boosted_combined <- grammy_nometa_boosted_ranking %>%
+  inner_join(billboard_nometa_boosted_ranking, 
+             by = c("names" = "names")) %>%
+  inner_join(streams_nometa_boosted_ranking, 
+             by = c("names" = "names"))
+
+meta_boosted_combined <- grammy_meta_boosted_ranking %>%
+  inner_join(billboard_meta_boosted_ranking, 
+             by = c("names" = "names")) %>%
+  inner_join(streams_meta_boosted_ranking, 
+             by = c("names" = "names"))
+
+# get row variance
+nometa_boosted_rankingvar <-  rowVars(as.matrix(nometa_boosted_combined %>%
+  dplyr::select(grammy_rank, billboard_rank, streams_rank)))
+nometa_boosted_absolutevar <- rowVars(as.matrix(nometa_boosted_combined %>%
+  dplyr::select(grammy_importance, billboard_importance, streams_importance)))
+meta_boosted_rankingvar <-  rowVars(as.matrix(meta_boosted_combined %>%
+  select(grammy_rank, billboard_rank, streams_rank)))
+meta_boosted_absolutevar <- rowVars(as.matrix(meta_boosted_combined %>%
+  select(grammy_importance, billboard_importance, streams_importance)))
+
+
+# final tibbles
+nometa_boosted_variableimportance <- bind_cols(
+  nometa_boosted_combined,
+  ranking_variance = nometa_boosted_rankingvar,
+  rel.inf_variance = nometa_boosted_absolutevar
+) %>% 
+  mutate(mean_ranking = (grammy_rank + 
+                             billboard_rank +
+                             streams_rank)/3)
+
+meta_boosted_variableimportance <- bind_cols(
+  meta_boosted_combined,
+  ranking_variance = meta_boosted_rankingvar,
+  rel.inf_variance = meta_boosted_absolutevar
+) %>% 
+  mutate(mean_ranking = (grammy_rank + 
+                             billboard_rank +
+                             streams_rank)/3)
+
+write.table(meta_boosted_variableimportance, file="meta_boosted_variableimportance")
+write.table(nometa_boosted_variableimportance, file="nometa_boosted_variableimportance")
+
+```
+
+
+
+
+```{r get-binary-probabilities, echo=FALSE, cache = TRUE, eval=FALSE}
+#get fitted probabilities on final models
+
+# logit regression
+grammy_nometa_logit_probabilities <- predict(glmnet_grammy, newdata = grammy_test,
+                                             type = "response")
+billboard_nometa_logit_probabilities <- predict(glmnet_billboard, newdata = billboard_test,
+                                             type = "response")
+streams_nometa_logit_probabilities <- predict(glmnet_streams, newdata = streams_test,
+                                             type = "response")
+grammy_meta_logit_probabilities <- predict(glmnet_grammy_meta, newdata = grammy_metadata_test,
+                                             type = "response")
+billboard_meta_logit_probabilities <- predict(glmnet_billboard_meta, 
+                                              newdata = (billboard_metadata_test %>%
+                                                           filter(!(time_signature == 1))),
+                                             type = "response")
+streams_meta_logit_probabilities <- predict(glmnet_streams_meta, newdata = streams_metadata_test,
+                                             type = "response")
+
+
+# pruned tree
+grammy_nometa_prunedtree_probabilities <- predict(pruned_grammy_tree, newdata = grammy_test)
+billboard_nometa_prunedtree_probabilities <- predict(pruned_billboard_tree, newdata = billboard_test)
+streams_nometa_prunedtree_probabilities <- predict(pruned_streams_tree, newdata = streams_test)
+
+grammy_meta_prunedtree_probabilities <- predict(pruned_grammy_metadata_tree, newdata = grammy_metadata_test)
+billboard_meta_prunedtree_probabilities <- predict(pruned_billboard_metadata_tree, newdata = billboard_metadata_test)
+# cannot use the predict function because the tuned tree is a single node
+streams_meta_prunedtree_probabilities <- #predict(pruned_streams_metadata_tree, newdata = streams_metadata_test)
+  rep(mean(streams_metadata_test$streams_achieved), nrow(streams_metadata_test)) 
+
+# random forest
+grammy_nometa_RF_probabilities <- predict(RF_grammy_nometa, newdata = grammy_test,
+                                             type = "response")
+billboard_nometa_RF_probabilities <- predict(RF_billboard_nometa, newdata = billboard_test,
+                                             type = "response")
+streams_nometa_RF_probabilities <- predict(RF_streams_nometa, newdata = streams_test,
+                                             type = "response")
+
+grammy_meta_RF_probabilities <- predict(RF_grammy_meta, newdata = grammy_metadata_test,
+                                             type = "response")
+billboard_meta_RF_probabilities <- predict(RF_billboard_meta, newdata = billboard_metadata_test,
+                                             type = "response")
+streams_meta_RF_probabilities <- predict(RF_streams_meta, newdata = streams_metadata_test,
+                                             type = "response")
+
+# boosted tree
+grammy_nometa_boosted_probabilities <- predict(gbm_grammy_nometa, newdata = grammy_test,
+                                             type = "response")
+billboard_nometa_boosted_probabilities <- predict(RF_billboard_nometa, newdata = billboard_test,
+                                             type = "response")
+streams_nometa_boosted_probabilities <- predict(RF_streams_nometa, newdata = streams_test,
+                                             type = "response")
+
+grammy_meta_boosted_probabilities <- predict(gbm_grammy_meta, newdata = grammy_metadata_test,
+                                             type = "response")
+billboard_meta_boosted_probabilities <- predict(gbm_billboard_meta, newdata = billboard_metadata_test,
+                                             type = "response")
+streams_meta_boosted_probabilities <- predict(gbm_streams_meta, newdata = streams_metadata_test,
+                                             type = "response")
+```
+```{r get-roc-data, echo=FALSE, cache = TRUE, eval=FALSE}
+# obtain ROC curves for each formulation and model combination
+
+# grammy_nometa
+logit_grammy_nometa_ROC <- roc(grammy_test$grammy, grammy_nometa_logit_probabilities)
+prunedtree_grammy_nometa_ROC <- roc(grammy_test$grammy, grammy_nometa_prunedtree_probabilities)
+randomforest_grammy_nometa_ROC <- roc(grammy_test$grammy, grammy_nometa_RF_probabilities)
+boosted_grammy_nometa_ROC <- roc(grammy_test$grammy, grammy_nometa_boosted_probabilities)
+
+# billboard_nometa
+logit_billboard_nometa_ROC <- roc(billboard_test$billboard, billboard_nometa_logit_probabilities)
+prunedtree_billboard_nometa_ROC <- roc(billboard_test$billboard, billboard_nometa_prunedtree_probabilities)
+randomforest_billboard_nometa_ROC <- roc(billboard_test$billboard, billboard_nometa_RF_probabilities)
+boosted_billboard_nometa_ROC <- roc(billboard_test$billboard, billboard_nometa_boosted_probabilities)
+
+# streams_nometa
+logit_streams_nometa_ROC <- roc(streams_test$streams_achieved, streams_nometa_logit_probabilities)
+prunedtree_streams_nometa_ROC <- roc(streams_test$streams_achieved, streams_nometa_prunedtree_probabilities)
+randomforest_streams_nometa_ROC <- roc(streams_test$streams_achieved, streams_nometa_RF_probabilities)
+boosted_streams_nometa_ROC <- roc(streams_test$streams_achieved, streams_nometa_boosted_probabilities)
+
+# grammy meta
+logit_grammy_meta_ROC <- roc(grammy_metadata_test$grammy, grammy_meta_logit_probabilities)
+prunedtree_grammy_meta_ROC <- roc(grammy_metadata_test$grammy, grammy_meta_prunedtree_probabilities)
+randomforest_grammy_meta_ROC <- roc(grammy_metadata_test$grammy, grammy_meta_RF_probabilities)
+boosted_grammy_meta_ROC <- roc(grammy_metadata_test$grammy, grammy_meta_boosted_probabilities)
+
+# billboard meta
+logit_billboard_meta_ROC <- roc((billboard_metadata_test %>% filter(!(time_signature == 1)) %>% select(billboard))$billboard, billboard_meta_logit_probabilities) 
+prunedtree_billboard_meta_ROC <- roc(billboard_metadata_test$billboard, billboard_meta_prunedtree_probabilities) 
+randomforest_billboard_meta_ROC <- roc(billboard_metadata_test$billboard, billboard_meta_RF_probabilities) 
+boosted_billboard_meta_ROC <- roc(billboard_metadata_test$billboard, billboard_meta_boosted_probabilities) 
+
+# streams meta
+logit_streams_meta_ROC <- roc(streams_metadata_test$streams_achieved, streams_meta_logit_probabilities) 
+prunedtree_streams_meta_ROC <- roc(streams_metadata_test$streams_achieved, streams_meta_prunedtree_probabilities) 
+randomforest_streams_meta_ROC <- roc(streams_metadata_test$streams_achieved, streams_meta_RF_probabilities) 
+boosted_streams_meta_ROC <- roc(streams_metadata_test$streams_achieved, streams_meta_boosted_probabilities) 
+```
+```{r get-roc-tibbles, echo=FALSE, cache = TRUE, eval=FALSE}
+# generate combined tibbles to plot ROC curves
+# grammy_nometa
+grammy_nometa_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_grammy_nometa_ROC$specificities,
+           TPR = logit_grammy_nometa_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_grammy_nometa_ROC$specificities,
+           TPR = prunedtree_grammy_nometa_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_grammy_nometa_ROC$specificities,
+           TPR = randomforest_grammy_nometa_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_grammy_nometa_ROC$specificities,
+           TPR = boosted_grammy_nometa_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+# billboard_nometa
+billboard_nometa_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_billboard_nometa_ROC$specificities,
+           TPR = logit_billboard_nometa_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_billboard_nometa_ROC$specificities,
+           TPR = prunedtree_billboard_nometa_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_billboard_nometa_ROC$specificities,
+           TPR = randomforest_billboard_nometa_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_billboard_nometa_ROC$specificities,
+           TPR = boosted_billboard_nometa_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+# streams_nometa
+streams_nometa_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_streams_nometa_ROC$specificities,
+           TPR = logit_streams_nometa_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_streams_nometa_ROC$specificities,
+           TPR = prunedtree_streams_nometa_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_streams_nometa_ROC$specificities,
+           TPR = randomforest_streams_nometa_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_streams_nometa_ROC$specificities,
+           TPR = boosted_streams_nometa_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+# grammy meta
+grammy_meta_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_grammy_meta_ROC$specificities,
+           TPR = logit_grammy_meta_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_grammy_meta_ROC$specificities,
+           TPR = prunedtree_grammy_meta_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_grammy_meta_ROC$specificities,
+           TPR = randomforest_grammy_meta_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_grammy_meta_ROC$specificities,
+           TPR = boosted_grammy_meta_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+# billboard meta
+billboard_meta_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_billboard_meta_ROC$specificities,
+           TPR = logit_billboard_meta_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_billboard_meta_ROC$specificities,
+           TPR = prunedtree_billboard_meta_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_billboard_meta_ROC$specificities,
+           TPR = randomforest_billboard_meta_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_billboard_meta_ROC$specificities,
+           TPR = boosted_billboard_meta_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+# streams metabil
+streams_meta_ROC_tibble <-
+  bind_rows(
+    tibble(FPR = 1-logit_streams_meta_ROC$specificities,
+           TPR = logit_streams_meta_ROC$sensitivities,
+           model = as.factor("Logit")),
+    tibble(FPR = 1-prunedtree_streams_meta_ROC$specificities,
+           TPR = prunedtree_streams_meta_ROC$sensitivities,
+           model = as.factor("Decision Tree")),
+    tibble(FPR = 1-randomforest_streams_meta_ROC$specificities,
+           TPR = randomforest_streams_meta_ROC$sensitivities,
+           model = as.factor("Random Forest")),
+    tibble(FPR = 1-boosted_streams_meta_ROC$specificities,
+           TPR = boosted_streams_meta_ROC$sensitivities,
+           model = as.factor("Boosted Tree")),
+  )
+
+
+write.table(grammy_meta_ROC_tibble, file = "grammy_meta_ROC_tibble")
+write.table(billboard_meta_ROC_tibble, file = "billboard_meta_ROC_tibble")
+write.table(streams_meta_ROC_tibble, file = "streams_meta_ROC_tibble")
+write.table(grammy_nometa_ROC_tibble, file = "grammy_meta_ROC_tibble")
+write.table(billboard_nometa_ROC_tibble, file = "billboard_nometa_ROC_tibble")
+write.table(streams_nometa_ROC_tibble, file = "streams_nometa_ROC_tibble")
+
+```
+```{r get-roc-plots, echo=FALSE, cache = TRUE, eval=TRUE}
+# plot ROC curves
+
+grammy_meta_ROC_tibble = read.table(file = "grammy_meta_ROC_tibble")
+billboard_meta_ROC_tibble = read.table(file = "billboard_meta_ROC_tibble")
+streams_meta_ROC_tibble = read.table("streams_meta_ROC_tibble")
+grammy_nometa_ROC_tibble = read.table("grammy_meta_ROC_tibble")
+billboard_nometa_ROC_tibble = read.table("billboard_nometa_ROC_tibble")
+streams_nometa_ROC_tibble = read.table("streams_nometa_ROC_tibble")
+
+grammy_nometa_ROC_plot <- grammy_nometa_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Grammy without Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+billboard_nometa_ROC_plot <- billboard_nometa_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Billboard without Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+streams_nometa_ROC_plot <- streams_nometa_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Streams without Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+
+grammy_meta_ROC_plot <- grammy_meta_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Grammy with Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+billboard_meta_ROC_plot <- billboard_meta_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Billboard with Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm'))+
+  theme(plot.title = element_text(hjust=0.5))
+
+streams_meta_ROC_plot <- streams_meta_ROC_tibble %>%
+  ggplot(aes(x = FPR, y = TPR, colour = model)) +
+  geom_point() +
+  labs(x = "False Positive Rate", y = "Total Positive Rate", title = "Streams with Metadata") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.3, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+```{r calc-roc-curves, echo=FALSE, cache = TRUE, eval=FALSE}
+# create tibble with area under the curve of each ROC curve
+auc_tibble <- tibble(
+    model = c("Logit", "Random Forest", "Boosted Tree"),
+    grammy_no_metadata = c(logit_grammy_nometa_ROC$auc, 
+                           randomforest_grammy_nometa_ROC$auc, 
+                           boosted_grammy_nometa_ROC$auc),
+    billboard_no_metadata = c(logit_billboard_nometa_ROC$auc, 
+                              randomforest_billboard_nometa_ROC$auc, 
+                              boosted_billboard_nometa_ROC$auc),
+    streams_no_metadata = c(logit_streams_nometa_ROC$auc, 
+                            randomforest_streams_nometa_ROC$auc, 
+                            boosted_streams_nometa_ROC$auc),
+    grammy_metadata = c(logit_grammy_meta_ROC$auc, 
+                           randomforest_grammy_meta_ROC$auc, 
+                           boosted_grammy_meta_ROC$auc),
+    billboard_metadata = c(logit_billboard_meta_ROC$auc, 
+                           randomforest_billboard_meta_ROC$auc, 
+                           boosted_billboard_meta_ROC$auc),
+    streams_metadata = c(logit_streams_meta_ROC$auc, 
+                            randomforest_streams_meta_ROC$auc, 
+                            boosted_streams_meta_ROC$auc)
+  )
+
+write.table(auc_tibble, file="auc_tibble")
+```
+
+
+### Overview
+
+This part of the study attempted to assess song popularity as a binary value taking either $0$ (unpopular) or $1$ (popular). This binary value was calculated using a variety of metrics. 
+
+The first criterion took the value of $1$ for a song that won a Grammy award (any award for any category in any year since 1960). We understood that if we selected just one kind of Grammy award, our results might be biased towards the features that made a song popular in that category, rather than creating a robust model that is generalizable to the overall features which make a song popular. 
+
+The second criterion is whether or not the song was featured in the Billboard Hot 100. This criteria was equal to $1$ for any song that was featured on the listing for any amount of time from any year between 1999-2019. 
+
+Finally, the third criterion we considered looked at the streaming history of a song on Spotify. We first calculated the number of days that a song achieved more than 1 million streams globally. Then, looking at the distribution of days that this song had over 1 million streams globally, we decided that a fair threshold for our purposes would be 14 days, i.e. the song popularity would take the value $1$ if there were 14 days in which the song achieved over 1 million listens on Spotify and 0 otherwise. These days did not have to be consecutive and the 1 million streams could be distributed among any number of countries/regions.
+
+We believed that the three criteria we were considering were different enough that it did not make any sense to aggregate them into one single metric for song popularity. Rather, at every step of the way, we ran each model on each of the separate criteria and interpreted results. Furthermore, we understood the importance that artist metadata (such as number of followers on Spotify, length of musical history, gender, etc.) could have on song popularity. For that reason, for each formulation and each response variable, we created two models, one for the artist metadata and the song and one that simply looked at the song-level variables. All told, this meant that six different models were ran for each formulation, which gave us the ability to look at any given model's findings with scrutiny. 
+
+```{r diff-data-sections, echo=FALSE, eval=TRUE}
+tibble(without_meta = c("Grammy as Response", "Billboard as Response", "Streams as Response"),
+       with_meta = c("Grammy as Response", "Billboard as Response", "Streams as Response")) %>%
+    kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Models without Metadata",
+                                      "Models with Metadata"),
+                        caption = "Description of six models run") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+Table \@ref(tab:diff-data-sections) summarises the different models we calculated for every different model formulation. For each grouping of data to build these models, a subset was withheld as validation data.
+
+We then used four different formulations to calculate our predictive models: logistic regression, decision tree, random forest and boosted tree. 
+
+#### Logistic regresion
+
+
+As expected, we computed six OLS logistic regressions. We decided to run this OLS logistic regression to give ourselves a baseline and understand how much improvement on the standard error we were getting through the different tree methods we were trying.
+
+#### Decision tree
+
+
+As trees are one of the most readable regression models, we decided to make decision trees for each model. To avoid overfitting, these trees were then pruned to an optimal size, with the parameter penalizing tree size chosen through cross validation.
+
+#### Random forest
+
+
+Random forests were grown for each model. Again, the tuning parameter $mtry$ was found through cross validation.
+
+#### Boosted tree
+
+
+For the boosted tree models, the parameters number of trees $M$, learning rate $\lambda$ and tree size $\vert T \vert$ were chosen through cross validation. During parameter tuning, the learning rate $\lambda$ was held fixed at $0.01$ and different tree sizes $\vert T \vert$ $1$ through $6$ were tried. With each combination of $\lambda$ and tree size $\vert T \vert$, the optimal number of trees $M$ was chosen. For a few models which, from the cross-validation results, seemed to benefit from the complex interactions of many different variables, the values $3$ through $8$ were tried for optimal tree size. 
+
+### Complications with Discrete Response
+
+
+The first complications that arose from this discrete methodology was the massive class imbalance that was presented in some of the data sets.
+
+```{r class-imbalance, echo=FALSE, eval=TRUE}
+read.table("data_imbalance_tibble") %>%
+  transmute(total_songs =total_songs, award=award, metadata_included=metadata_included,
+            awards_given=awards_given, prc_total = prc_total*100) %>%
+  kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Num Songs in Data", 
+                                      "Award Criterion",
+                                      "Metadata?",
+                                      "Num Awards in Data",
+                                      "% in Positive Class"),
+                        caption = "Class imbalance in the final data") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+  
+```
+
+The class imbalance was particularly a problem for the Grammy data set, since so few Grammy awards matched songs in the other data set (not to mention that few Grammy awards have been given in total). Using a song's presence on the Billboard Hot 100 as a criterion was not necessarily a criterion until joining the song with the artist metadata, which reduced the negative class considerably. It is intuitive, though, that the songs that are less famous would have less information about their artists. In addition to the class imbalance, we can see a lack of observations in the Spotify data in general. This is especially accentuated after joining the Spotify stream data with the artist metadata. However, because of the criterion chosen, class imbalance is less of an issue. 
+
+In order to best deal with these issues, the training data set downsamples from the majority class by a substantial margin. Moreover, it samples from the minority class twice. This procedure was done so that the a proportion (at least 20%) of the data was held in reserve for validation.
+
+Beyond issues with the data itself, it turned out that the decision tree was a terrible model for the data.
+
+```{r decision-tree-sizes, echo=FALSE, eval=TRUE}
+read.table("decision_tree_sizes") %>%
+  kable(format = "latex", row.names = FALSE,
+                        booktabs = TRUE,
+                        digits = 2,
+                        col.names = c("Metadata Included?", 
+                                      "Grammy Award",
+                                      "Billboard Hot 100",
+                                      "14 days of 1M Streams"),
+                        caption = "Tree size for the decesision trees calculated on different partitions of data") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+Some of these trees were concerningly small, in particular the tree fit to the `Grammy without Metadata` data and the tree fit to the `Streams with Metadata` data, which, after CV pruning, was reduced to a single node. 
+
+### Findings
+
+#### Model fit
+
+
+Plotting the ROC (receiver operating characteristic) curves reveals that some models did significantly better than others.
+
+```{r roc-curve-comparison, fig.width = 7, fig.height = 4, out.width = "100%", fig.align='center', fig.cap = "ROC curves of various models", echo=FALSE, eval=TRUE}
+plot_grid(grammy_nometa_ROC_plot, 
+          grammy_meta_ROC_plot,
+          billboard_nometa_ROC_plot, 
+          billboard_meta_ROC_plot,
+          streams_nometa_ROC_plot,
+          streams_meta_ROC_plot,
+          nrow=3, ncol = 2)
+```
+First, the ROC curves show the limitations of the decision tree model. Because of the simplicity of the models, only a scarce handful of values can be plotted for them. 
+
+Moreover, though the Grammy prediction models seem to fare slightly better than the models with Streams as a criterion, the neither of the criteria have been able to generate a model with good predictive capacity. Especially with the Streams as a criterion, all of the ROC curves appear very close to the 45 degree line, suggesting that their predictive power is not much better than just randomly guessing. In fact, we can even see that in the logistic regression fit to the `Grammy with Metadata` data, the model does slightly *worse* than random (which, I guess, in theory is a better classifier than one that classifies randomly).
+
+```{r auc, echo=FALSE, eval=TRUE}
+read.table("auc_tibble") %>% kable(format = "latex", row.names = NA,
+                        booktabs = TRUE,
+                        digits = 3,
+                        col.names = c("Model",
+                                      "Grammy",
+                                      "Billboard",
+                                      "Streams",
+                                      "Grammy w Meta",
+                                      "Billboard w Meta",
+                                      "Streams w Meta"),
+                        caption = "Area under the curve of ROC curves") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+The models fit to the `Grammy without Metadata` set did decently (perhaps because this set had many more observations than the data set with metadata.) Moreover, the Random Forest classifier on the `Grammy with Metadata` set performed reasonably well, but considering how small the sample size was and how poorly the other models performed, we can conclude that perhaps this is just random chance. 
+
+What is immediately visible is that the models fit to the data with `Billboard Hot 100` as a criterion fared much better than the other models. This could potentially be indicative of the fact that there is more coherence in the factors that get a song to this list, or it could be indicative of the fact that, with more and less lopsided data, the models can be better fit. Additionally, for whatever reason, in the `Billboard without Metadata` data, the random forest ROC curve is completely identical to the boosted ROC curve. Regardless, this increased classification accuracy means that the findings from the Billboard data should be taken more seriously than the findings from the other models. 
+
+#### Model interpretation
+
+
+```{r import-coef-tibbles, echo=FALSE, eval=TRUE}
+logit_meta_summary_tibble = read.table("logit_meta_summary_tibble") %>%
+  arrange(mean_ranking)
+logit_nometa_summary_tibble = read.table("logit_nometa_summary_tibble") %>%
+  arrange(mean_ranking)
+meta_boosted_variableimportance = read.table("meta_boosted_variableimportance") %>%
+  arrange(mean_ranking)
+nometa_boosted_variableimportance = read.table("nometa_boosted_variableimportance") %>%
+  arrange(mean_ranking)
+nometa_purity_combined = read.table("nometa_purity_combined") %>%
+  arrange(mean_ranking)
+meta_purity_combined = read.table("meta_purity_combined") %>% 
+  arrange(mean_ranking)
+```
+```{r make-coef-plots, echo=FALSE, eval=TRUE}
+logit_meta_coefs_plot = logit_meta_summary_tibble %>%
+  head(4) %>%
+  select(names, grammy, billboard, streams) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Coefficient", title="Logit with Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+logit_nometa_coefs_plot = logit_nometa_summary_tibble %>%
+  head(4) %>%
+  select(names, grammy, billboard, streams) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Coefficient", title="Logit no Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+randomforest_nometa_coefs_plot = nometa_purity_combined %>%
+  head(4) %>%
+  transmute(names = names, grammy = grammy_rank, billboard = billboard_rank, streams = streams_rank) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Incr Node Purity", title="Random Forest no Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+randomforest_meta_coefs_plot = meta_purity_combined %>%
+  head(4) %>%
+  transmute(names = names, grammy = grammy_rank, billboard = billboard_rank, streams = streams_rank) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Incr Node Purity", title="Random Forest with Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+meta_boosted_coef_plot = meta_boosted_variableimportance %>%
+  head(4) %>%
+  transmute(names = names, grammy = grammy_rank, billboard = billboard_rank, streams = streams_rank) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Var Importance", title="Boosted with Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+nometa_boosted_coef_plot = nometa_boosted_variableimportance %>%
+  head(4) %>%
+  transmute(names = names, grammy = grammy_rank, billboard = billboard_rank, streams = streams_rank) %>%
+  pivot_longer(cols = c(grammy, billboard, streams), names_to = "target_metric",
+               values_to = "coefficient") %>%
+  transmute(names = names, target_metric = factor(target_metric), coefficient = coefficient) %>%
+  ggplot(aes(y = coefficient, x = names, fill = target_metric)) +
+  labs(x="Important Variables", y="Var Importance", title="Boosted no Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm')) +
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+```{r print-grid-coefs-plot, fig.width = 9, fig.height = 4, out.width = "100%", fig.align='center', fig.cap = "Most important variables of each model", echo=FALSE, eval=TRUE}
+plot_grid(logit_nometa_coefs_plot,logit_meta_coefs_plot,
+          randomforest_nometa_coefs_plot, randomforest_meta_coefs_plot,
+          nometa_boosted_coef_plot, meta_boosted_coef_plot,
+          nrow=3, ncol=2)
+```
+
+Figure \@ref(fig:print-grid-coefs-plot) takes the average ranking of each feature across the three different response variables (Grammy, Billboard and Streams) and then displays the top four ranked variables. The figure confirms what we had seen in the previous section on model evaluation: the ensemble models are much better than logistic regression. There same variables appear several times: `loudness`, `acousticness`, `danceability`, `speechiness`, `duration_ms` and `Followers`. It seems quite intuitive that these variables would have a strong correlation with song success, since successful the most popular genres today tend to be rap (speechiness), singer/songwriter or folk (acousticness), or pop (danceability). Moreover, of course there should be a huge positive correlation between the number of followers of an artist and the popularity of his/her/their music; that correlation was one of the main reasons why we chose to incorporate artist metadata in the first place.
+
+Moreover, it's very possible to see what could have led the logit models astray is the huge negative coefficient that they placed on the different time signatures. As 4/4 time is by far the most common time signature, it makes sense that anything that deviates from the dummy `time_signature4` would have a negative coefficient. However, the fact that the coefficients on `time_signature1` and `time_signature5` are so deeply negative is probably just indicative of a small sample size, with an overwhelming majority of those few observations with this time signature pertaining to the negative class. 
+
+```{r calc-billboard-plots, eval=TRUE, echo=FALSE}
+billboard_scaled_meta <- meta_purity_combined %>% 
+                transmute(names = names,
+                          random_forest = scale(billboard_importance)) %>%
+  inner_join((meta_boosted_variableimportance %>% 
+                transmute(names = names,
+                          boosted = scale(billboard_importance))), by="names") %>%
+  mutate(avg_tree_imp = (random_forest+boosted)/2) %>%
+  arrange(avg_tree_imp)
+
+billboard_scaled_nometa <- nometa_purity_combined %>% 
+                transmute(names = names,
+                          random_forest = scale(billboard_importance)) %>%
+  inner_join((nometa_boosted_variableimportance %>% 
+                transmute(names = names,
+                          boosted = scale(billboard_importance))), by="names") %>%
+  mutate(avg_tree_imp = (random_forest+boosted)/2) %>%
+  arrange(avg_tree_imp)
+
+billboard_scaled_meta_plot = billboard_scaled_meta %>%
+  pivot_longer(cols=c(random_forest, boosted),
+               names_to = "Model",
+               values_to = "Standardized Coef") %>%
+  transmute(names=names,avg_tree_imp=avg_tree_imp,Model=as.factor(Model),
+            `Standardized Coef` = `Standardized Coef`) %>%
+  ggplot(aes(x=`Standardized Coef`, y=names, fill=Model)) +
+  geom_bar(position="dodge", stat="identity") +
+  labs(x="Standardized Importance", y="Variable", title="Billboard with Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+
+billboard_scaled_nometa_plot = billboard_scaled_nometa %>%
+  pivot_longer(cols=c(random_forest, boosted),
+               names_to = "Model",
+               values_to = "Standardized Coef") %>%
+  transmute(names=names,avg_tree_imp=avg_tree_imp,Model=as.factor(Model),
+            `Standardized Coef` = `Standardized Coef`) %>%
+  ggplot(aes(x=`Standardized Coef`, y=names, fill=Model)) +
+  geom_bar(position="dodge", stat="identity") +
+  labs(x="Standardized Importance", y="Variable", title="Billboard without Metadata") +
+  geom_bar(position="dodge", stat="identity") +
+  theme(text = element_text(size=9),
+        legend.key.size = unit(0.2, 'cm'))  +
+  theme(plot.title = element_text(hjust=0.5))
+```
+```{r billboard-coefs-trees, fig.width = 6, fig.height = 6, out.width = "100%", fig.align='center', fig.cap = "Standardized importance of all vars with Billboard Hot 100 as response", echo=FALSE, eval=TRUE}
+plot_grid(billboard_scaled_meta_plot, billboard_scaled_nometa_plot,
+          nrow=2, ncol=1)
+```
+
+Figure \@ref(fig:billboard-coefs-trees) shows right away the general agreement of the random forest and boosted models on the Billboard Hot 100 data, both with and without metadata. It shows that once the logistic regression coefficients are removed from the data, suddenly brand new coefficients emerge as important. On the plot without metadata, `instrumentalness` becomes enormously the most important variable in the models without metadata, as does `years_since_1st_album`, `is_group` and `sections` for the models with metadata. 
+
+```{r most-pos-neg, echo=FALSE,eval=TRUE}
+tibble(
+  most_positive_name = billboard_scaled_meta %>% arrange(desc(avg_tree_imp)) %>%
+    head(5) %>% pull(names),
+  most_positive = billboard_scaled_meta %>% arrange(desc(avg_tree_imp)) %>%
+    head(5) %>% pull(avg_tree_imp),
+  most_negative_name = billboard_scaled_meta %>% arrange(avg_tree_imp) %>%
+    head(5) %>% pull(names),
+  most_negative = billboard_scaled_meta %>% arrange(avg_tree_imp) %>%
+    head(5) %>% pull(avg_tree_imp)
+) %>% kable(format = "latex", row.names = NA,
+                        booktabs = TRUE,
+                        digits = 3,
+                        col.names = c("Name Most Positive Vars",
+                                      "Standardized Importance",
+                                      "Name Most Negative Vars",
+                                      "Standardized Importance"),
+                        caption = "Most positive and negative five variables") %>%
+  kable_styling(position = "center") %>%
+  kable_styling(latex_options = "HOLD_position")
+  
+```
+
+Table \@ref(tab:most-pos-neg) averages the standardized variable importance of both the boosted and random forest models on the Billboard data with metadata and takes the top five most positive and negative averages. On the positive side, we can conclude that young musicians who are struggling to succeed in the industry shouldn't give up. In fact, the standardized importance of `years_since_1st_album` is over 2.5 standard deviations from the mean value. In addition, loudness is important, is it may make your music more engaging, and increased Followers also translate into increased probability of an artist's song becoming a hit. 
+
+On the negative side, the most negative coefficient is that on `is_group`. Potentially this is because it's harder for fans to obssess over a group than it is for them to obssess over a singular artist. Behind `is_group` is the variable `sections`, whose negative coefficient indicates that listeners want simpler songs with fewer sections. The sign and magnitude of the coefficient on `is_male` is also surprising to us, as we assumed that male musicians were much more popular than female musicians. Apparently, the modern music industry has managed to at least start reversing the previous sexist trend. The fourth most negative coefficient, `liveness`, indicates that listeners want their music to sound seamless, as if it were straight from the production studio. Knowing that in Brazil, for example, where the most common recordings are the ones that come from concerts, this is an insightful discovery about global music culture. Lastly, the coefficient on `chorus_hit` suggests that listeners would rather have a chorus occur sooner in a song rather than later. Considering that the chorus is, by far, the most remembered part of a given song, this is not surprising.
+
+This portion of the analysis, which integrates artist metadata into the models, supports the findings in [@askin2017makes] that a song's position on the charts is strongly influenced by artist familiarity. This conclusion is echoed in figure \@ref(fig:billboard-coefs-trees), which shows that the number of followers an artist has on Spotify is the second or third most important variable in determining a song's presence in the Billboard Hot 100.
+
+
+# Conclusion
+
+Our findings indicate that, although song-level attributes do not explain all of the variance in song popularity, they are heavily indicative of how popular a song may be. 
+
+In the unsupervised learning portion of this project, we found that not only can song-level features very distinctly classify songs into very different genres/vibes, however these classifications can be extremely predictive of song popularity. In the extreme case, Cluster 1 (Slow, Soul, Breakup) as over 13 times more popular than Cluster 10 (Background music), as defined by average streams per song. Looking at the subjective descriptions of these groups, it seems very intuitive that Cluster 1 would be more popular than Cluster 10. Moreover, looking at the number of songs per cluster, we can see that it appears that the industry is relatively aware of popularity differences among clusters, as the second most popular cluster, Cluster 9 (Popular, Radio, Head-Nod (Not Dance)), is by far the most represented cluster in the data.
+
+When it comes to model evaluation in the supervised learning portion of this project, we can see that tree methods are a much more adequate tool for prediction than linear methods. [Continuous Response] shows that regularization did not improve the fit of the model on the data largely, with only a minor improvement. Moreover, [Discrete Response] showed that, when the data was adequate for modeling, tree methods led to much better ROC curves. In both sections, we see that, in fact, the tree methods and the linear methods even substantially disagree with the *signs* of the coefficients. 
+
+In the data without artist metadata, we found in [Discrete Response] that `instrumentalness`, `danceability` and `acousticness` have the most positive influence in song popularity, and `sections`, `liveness` and `chorus_hit` are among the variables with the greatest negative influence in popularity. This is slightly different from the variables with the greatest positive effect in [Continuous Response], as the variables with the greatest positive influence are `acousticness`, `duration_ms`, `sections` and the variables with the greatest negative influence are `instrumentalness`, `liveness` and `tempo`. This is fascinating, because, between the two different kinds of response variables, the coefficients on `instrumentalness` and `sections` changed in a big way. Looking at the findings in [Clustering], `duration_ms` and `sections` are defining features of Cluster 6 (orchestral music), which also, as a less popular genre, helps potentially explain the negative coefficients on those variables in the models above. Moreover, `instrumentalness` is very positively associated with identity in Cluster 10, the least popular group, and, to a slightly lesser extent, positively associated with Cluster 7, the second most popular group. This potentially explains some of the heterogeneity in the coefficient on `instrumentalness`. It suggests that this study is, in fact, very complicated, because the treatment effect is *not* homogeneous, or, in other words, more of some features may be beneficial in certain genres, but less so in others. 
+
+In conclusion, though there is some agreement in the models that variables like `acousticness` increase the chances of making a song a hit and variables like `liveness` are not so well received by global listeners, the huge variability in the models' findings shows that there is heterogeneity in the treatment effect and that there is no one-size-fits-all method of designing a hit song. Furthermore, with the findings in [Discrete Response] that artist metadata ia also hugely influential in song popularity, our study suggests that music producers should understand the limitations of the studied features as 'leavers' to increase song popularity. 
+
+In future iterations of studies on the impact of song-level features on song popularity, it may make sense to cluster the songs through some unsupervised learning algorithm, as we did, and then run separate models for each individual cluster. This may help achieve homogeneity of the treatment effect, as perhaps song length's impact on song popularity is uniform in one genre and may have a different uniform impact on songs in other genres.
+
+# Individual Contributions
+
+Ethan Kallett: In charge of the `Discrete Response` methods section and `Data Review`
+
+Sabrina Peltier: In charge of the `Clustering` methods section
+
+Sabhya Raju: In charge of the `Continuous Response` methods section
+
+Rohin Shivdasani: In charge of `Introduction` and `Literature Review`, as well as playing a supporting role on the `Continuous Response` methods section
+
+The `Conclusion` was a collective effort among all teammates. And though certain teammates may have been in charge of a certain portion of the assignment, we all collaborated and helped each other whenever someone was stuck.
+
+
+
+
+# Reference 
